@@ -6,6 +6,8 @@ import { supabase } from '../../../services/api/supabase'
 import 'react-native-get-random-values'
 import Report from '../models/Report'
 
+import ImagePickerSection from './form/ImagePickerSection'
+
 interface ReportFormProps {
     userId: string
 }
@@ -33,6 +35,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
     const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
     const [address, setAddress] = useState<string>('')
     const [permissionStatus, setPermissionStatus] = useState<string>('')
+    const [images, setImages] = useState<string[]>([])
 
     const [status, setStatus] = useState<string>('')
 
@@ -167,7 +170,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
                     report.userId = userId
                     report.latitude = finalLocation!.lat // We checked it's not null/undefined or returned
                     report.longitude = finalLocation!.lng
-                    report.images = []
+                    report.images = images
                     report.createdAt = new Date()
                     report.synced = false
                 })
@@ -179,6 +182,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
             setReporterName('')
             setIncidentType(1)
             setSeverity(2)
+            setImages([])
             // setLocation(null) 
             // setAddress('') // Keep address visible or clear? Let's clear to avoid stale info if they move significantly, but useEffect only runs once. 
             // Actually, if we clear, the next report won't have it unless we re-fetch.
@@ -268,6 +272,8 @@ export default function ReportForm({ userId }: ReportFormProps) {
                     </Text>
                 )}
             </View>
+
+            <ImagePickerSection images={images} onImagesChange={setImages} />
 
             <View style={{ marginTop: 20 }}>
                 <Button title="Save Report" onPress={handleSave} />
