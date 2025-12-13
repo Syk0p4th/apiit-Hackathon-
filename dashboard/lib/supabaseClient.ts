@@ -8,12 +8,12 @@ export function getSupabaseClient() {
   if (typeof window === "undefined") {
     return null;
   }
-  
+
   if (supabaseInstance) return supabaseInstance;
-  
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  
+
   if (!supabaseUrl || !supabaseAnonKey) {
     console.error("Supabase environment variables not set:", {
       url: supabaseUrl ? "set" : "missing",
@@ -21,9 +21,8 @@ export function getSupabaseClient() {
     });
     return null;
   }
-  
+
   supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
-  console.log(supabaseInstance)
   return supabaseInstance;
 }
 
