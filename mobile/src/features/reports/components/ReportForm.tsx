@@ -4,7 +4,11 @@ import database from '../../../services/database'
 import 'react-native-get-random-values'
 import Report from '../models/Report'
 
-export default function ReportForm() {
+interface ReportFormProps {
+    userId: string
+}
+
+export default function ReportForm({ userId }: ReportFormProps) {
     const [title, setTitle] = useState<string>('')
     const [description, setDescription] = useState<string>('')
     const [status, setStatus] = useState<string>('')
@@ -18,7 +22,7 @@ export default function ReportForm() {
                 await reportsCollection.create(report => {
                     report.title = title
                     report.description = description
-                    report.userId = 'current-user-id'
+                    report.userId = userId
                 })
             })
             setStatus('Saved Offline')
