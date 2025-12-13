@@ -9,28 +9,36 @@ interface ReportListProps {
     userId: string
 }
 
-const ReportItem = ({ report }: { report: Report }) => (
-    <View style={styles.card}>
-        <View style={styles.headerRow}>
-            <Text style={styles.title}>{report.title}</Text>
-            <View style={[styles.badge, report.synced ? styles.badgeSynced : styles.badgePending]}>
-                <Text style={styles.badgeText}>
-                    {report.synced ? 'Synced ✅' : 'Pending ⏳'}
-                </Text>
+const ReportItemComponent = ({ report }: { report: Report }) => {
+    const isSynced = report.syncStatus === 'synced'
+
+    return (
+        <View style={styles.card}>
+            <View style={styles.headerRow}>
+                <Text style={styles.title}>{report.title}</Text>
+                <View style={[styles.badge, isSynced ? styles.badgeSynced : styles.badgePending]}>
+                    <Text style={styles.badgeText}>
+                        {isSynced ? 'Synced ✅' : 'Pending ⏳'}
+                    </Text>
+                </View>
             </View>
-        </View>
 
-        <Text style={styles.description}>{report.description}</Text>
+            <Text style={styles.description}>{report.description}</Text>
 
-        <View style={styles.metaRow}>
-            <Text style={styles.meta}>Severity: {report.severityLabel}</Text>
-            <Text style={styles.meta}>Type: {report.incidentTypeLabel}</Text>
+            <View style={styles.metaRow}>
+                <Text style={styles.meta}>Severity: {report.severityLabel}</Text>
+                <Text style={styles.meta}>Type: {report.incidentTypeLabel}</Text>
+            </View>
+            <Text style={styles.coords}>
+                {report.latitude?.toFixed(4)}, {report.longitude?.toFixed(4)}
+            </Text>
         </View>
-        <Text style={styles.coords}>
-            {report.latitude?.toFixed(4)}, {report.longitude?.toFixed(4)}
-        </Text>
-    </View>
-)
+    )
+}
+
+const ReportItem = withObservables(['report'], ({ report }) => ({
+    report
+}))(ReportItemComponent)
 
 const getSeverityColor = (severity: number) => {
     switch (severity) {
@@ -41,11 +49,11 @@ const getSeverityColor = (severity: number) => {
 }
 
 const ReportList: React.FC<ReportListProps> = ({ reports }) => {
-    // Split reports into two groups
-    const pendingReports = reports.filter(r => !r.synced)
-    const syncedReports = reports.filter(r => r.synced)
+    // Split reports into two groups using internal status
+    const pendingReports = reports.filter(r => r.syncStatus !== 'synced')
+    const syncedReports = reports.filter(r => r.syncStatus === 'synced')
 
-    // Sort: Pending (Oldest first - FIFO?), Synced (Newest first)
+    // Sort: Pending (Oldest first), Synced (Newest first)
     pendingReports.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     syncedReports.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 
