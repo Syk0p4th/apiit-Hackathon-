@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { View, TextInput, Button, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native'
-import { LeafletView } from 'react-native-leaflet-view'
-import { WebView } from 'react-native-webview'
+import { View, TextInput, Button, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
 import * as Location from 'expo-location'
 import database from '../../../services/database'
 import 'react-native-get-random-values'
@@ -10,48 +8,6 @@ import Report from '../models/Report'
 interface ReportFormProps {
     userId: string
 }
-
-const getMapHtml = (location: { lat: number; lng: number } | null) => `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-    <style>
-        body { margin: 0; padding: 0; }
-        #map { width: 100%; height: 100vh; }
-    </style>
-</head>
-<body>
-    <div id="map"></div>
-    <script>
-        var map = L.map('map').setView([${location ? location.lat : 6.9271}, ${location ? location.lng : 79.8612}], 13);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        }).addTo(map);
-
-        ${location ? `L.marker([${location.lat}, ${location.lng}]).addTo(map);` : ''}
-
-        map.on('click', function(e) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'click',
-                payload: { lat: e.latlng.lat, lng: e.latlng.lng }
-            }));
-            
-            // Clear existing markers and add new one
-            map.eachLayer(function (layer) {
-                if (layer instanceof L.Marker) {
-                    map.removeLayer(layer);
-                }
-            });
-            L.marker(e.latlng).addTo(map);
-        });
-    </script>
-</body>
-</html>
-`
 
 const INCIDENT_TYPES = [
     { label: 'Flooding', value: 1 },
@@ -74,27 +30,68 @@ export default function ReportForm({ userId }: ReportFormProps) {
     const [incidentType, setIncidentType] = useState<number>(1)
     const [severity, setSeverity] = useState<number>(2)
     const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
+    const [address, setAddress] = useState<string>('')
+    const [permissionStatus, setPermissionStatus] = useState<string>('')
+
+    const [status, setStatus] = useState<string>('')
 
     useEffect(() => {
         (async () => {
-            const { status } = await Location.requestForegroundPermissionsAsync()
-            if (status !== 'granted') {
+            // 1. Check if GPS is on
+            const servicesEnabled = await Location.hasServicesEnabledAsync()
+            if (!servicesEnabled) {
+                setPermissionStatus('GPS is off. Enable Location Services.')
                 return
             }
 
-            const location = await Location.getCurrentPositionAsync({})
-            setLocation({
-                lat: location.coords.latitude,
-                lng: location.coords.longitude,
-            })
+            // 2. Check Permissions
+            const { status } = await Location.requestForegroundPermissionsAsync()
+            if (status !== 'granted') {
+                setPermissionStatus('Permission denied')
+                return
+            }
+
+            try {
+                // 3. Try Last Known Location (Fastest)
+                let loc = await Location.getLastKnownPositionAsync({})
+
+                // 4. If no last known, try current (Slower)
+                if (!loc) {
+                    loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+                }
+
+                if (loc) {
+                    setLocation({
+                        lat: loc.coords.latitude,
+                        lng: loc.coords.longitude,
+                    })
+                    fetchAddress(loc.coords.latitude, loc.coords.longitude)
+                } else {
+                    setPermissionStatus('Waiting for GPS...')
+                }
+
+            } catch (e) {
+                console.log('Error fetching location:', e)
+                setPermissionStatus('GPS Signal Weak')
+            }
         })()
     }, [])
 
-    const [status, setStatus] = useState<string>('')
+    const fetchAddress = async (lat: number, lng: number) => {
+        try {
+            const geocode = await Location.reverseGeocodeAsync({ latitude: lat, longitude: lng })
+            if (geocode.length > 0) {
+                const addr = geocode[0]
+                const addressString = `${addr.street || ''} ${addr.city || ''}, ${addr.region || ''}`
+                setAddress(addressString.trim())
+            }
+        } catch (e) { }
+    }
 
     const handleSave = async () => {
         if (!title || !description) {
             setStatus('Title and Description are required')
+            setTimeout(() => setStatus(''), 3000)
             return
         }
 
@@ -103,27 +100,40 @@ export default function ReportForm({ userId }: ReportFormProps) {
         if (!finalLocation) {
             try {
                 setStatus('Getting location...')
-                const { status } = await Location.requestForegroundPermissionsAsync()
-                if (status !== 'granted') {
-                    setStatus('Permission to access location was denied')
+
+                const servicesEnabled = await Location.hasServicesEnabledAsync()
+                if (!servicesEnabled) {
+                    setStatus('Please enable GPS')
                     return
                 }
 
-                const location = await Location.getCurrentPositionAsync({})
-                finalLocation = {
-                    lat: location.coords.latitude,
-                    lng: location.coords.longitude,
+                const { status } = await Location.requestForegroundPermissionsAsync()
+                if (status !== 'granted') {
+                    setStatus('Permission denied')
+                    return
+                }
+
+                let loc = await Location.getLastKnownPositionAsync({})
+                if (!loc) {
+                    loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+                }
+
+                if (loc) {
+                    finalLocation = {
+                        lat: loc.coords.latitude,
+                        lng: loc.coords.longitude,
+                    }
+                    setLocation(finalLocation)
+                    fetchAddress(finalLocation.lat, finalLocation.lng)
+                } else {
+                    setStatus('Could not lock GPS')
+                    return
                 }
             } catch (error) {
                 console.error(error)
-                setStatus('Error fetching location')
+                setStatus('Could not get GPS location')
                 return
             }
-        }
-
-        if (!finalLocation) {
-            setStatus('Could not determine location')
-            return
         }
 
         try {
@@ -131,13 +141,14 @@ export default function ReportForm({ userId }: ReportFormProps) {
                 const reportsCollection = database.get<Report>('reports')
                 await reportsCollection.create(report => {
                     report.title = title
-                    report.description = description
+                    // Append address to description if available, since we don't have an address column yet
+                    report.description = address ? `${description}\n\n[Location: ${address}]` : description
                     report.reporterName = reporterName
                     report.incidentType = incidentType
                     report.severity = severity
-                    report.incidentTime = new Date() // Default to now for incident time
+                    report.incidentTime = new Date()
                     report.userId = userId
-                    report.latitude = finalLocation!.lat
+                    report.latitude = finalLocation!.lat // We checked it's not null/undefined or returned
                     report.longitude = finalLocation!.lng
                     report.createdAt = new Date()
                     report.synced = false
@@ -150,7 +161,10 @@ export default function ReportForm({ userId }: ReportFormProps) {
             setReporterName('')
             setIncidentType(1)
             setSeverity(2)
-            setLocation(null)
+            // setLocation(null) 
+            // setAddress('') // Keep address visible or clear? Let's clear to avoid stale info if they move significantly, but useEffect only runs once. 
+            // Actually, if we clear, the next report won't have it unless we re-fetch.
+            // Let's keep it for now.
 
             setTimeout(() => setStatus(''), 3000)
         } catch (e) {
@@ -221,23 +235,20 @@ export default function ReportForm({ userId }: ReportFormProps) {
             <TypeSelector />
             <SeveritySelector />
 
-            <View style={styles.mapContainer}>
-                <WebView
-                    originWhitelist={['*']}
-                    source={{ html: getMapHtml(location) }}
-                    onMessage={(event) => {
-                        if (event.nativeEvent.data) {
-                            try {
-                                const data = JSON.parse(event.nativeEvent.data);
-                                if (data.type === 'click') {
-                                    setLocation(data.payload);
-                                }
-                            } catch (e) {
-                                console.error('Map message error:', e);
-                            }
-                        }
-                    }}
-                />
+            <View style={styles.locationContainer}>
+                <Text style={styles.label}>GPS Location:</Text>
+                {location ? (
+                    <>
+                        <Text style={styles.coords}>
+                            Lat: {location.lat.toFixed(5)}, Lng: {location.lng.toFixed(5)}
+                        </Text>
+                        {!!address && <Text style={styles.address}>📍 {address}</Text>}
+                    </>
+                ) : (
+                    <Text style={[styles.coords, { color: 'orange' }]}>
+                        {permissionStatus ? permissionStatus : 'Acquiring Satellite/GPS...'}
+                    </Text>
+                )}
             </View>
 
             <View style={{ marginTop: 20 }}>
@@ -252,20 +263,6 @@ const styles = StyleSheet.create({
     container: { padding: 20 },
     header: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
     input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 5, padding: 10, marginBottom: 15, backgroundColor: '#fff' },
-    mapContainer: {
-        height: 250,
-        marginBottom: 20,
-        borderRadius: 10,
-        overflow: 'hidden',
-    },
-    locationContainer: {
-        marginBottom: 10,
-    },
-    coords: {
-        fontSize: 14,
-        color: '#666',
-        marginTop: 2
-    },
     status: { marginTop: 15, fontSize: 16, color: 'blue', textAlign: 'center' },
 
     selectorContainer: { marginBottom: 15 },
@@ -274,5 +271,26 @@ const styles = StyleSheet.create({
     selectBtn: { padding: 8, borderWidth: 1, borderColor: '#ddd', borderRadius: 20, backgroundColor: '#f0f0f0' },
     selectBtnActive: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
     selectBtnText: { fontSize: 12, color: '#333' },
-    selectBtnTextActive: { color: '#fff' }
+    selectBtnTextActive: { color: '#fff' },
+
+    locationContainer: {
+        marginTop: 10,
+        padding: 10,
+        backgroundColor: '#f9f9f9',
+        borderRadius: 5,
+        borderWidth: 1,
+        borderColor: '#eee'
+    },
+    coords: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#333',
+        marginTop: 2
+    },
+    address: {
+        fontSize: 14,
+        color: '#007AFF',
+        marginTop: 4,
+        fontStyle: 'italic'
+    },
 })
