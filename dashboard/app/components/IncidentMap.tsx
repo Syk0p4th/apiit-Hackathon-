@@ -136,7 +136,7 @@ export default function IncidentMap({ incidents }: { incidents: Incident[] }) {
         <Marker
           key={inc.id}
           position={[inc.latitude || 0, inc.longitude || 0]}
-          icon={getIconBySeverity(inc.severity)}
+          icon={getIconBySeverity(inc.severity ?? null)}
         >
           <Popup>
             <div className="text-xs">
