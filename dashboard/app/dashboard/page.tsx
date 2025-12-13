@@ -269,8 +269,8 @@ export default function DashboardPage() {
         <StatCard label="Critical (S1)" value={critical.toString()} />
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        <div className="lg:col-span-2">
+      <section className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[800px]">
+        <div className="lg:col-span-2 sticky top-0 h-fit">
           <div className="h-[378px] bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
             <IncidentMap incidents={incidents} focusLocation={focusLocation} />
           </div>
