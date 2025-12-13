@@ -18,8 +18,12 @@ export async function sync() {
 
     isSyncing = true
     try {
-        const { data: { user } } = await supabase.auth.getUser()
-
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.user) {
+            console.error('User not authenticated')
+            return
+        }
+        const user = session.user
         await synchronize({
             database,
             sendCreatedAsUpdated: false, // Explicitly separate create/update for clearer debugging

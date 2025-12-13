@@ -117,9 +117,9 @@ export default function ReportForm({ userId }: ReportFormProps) {
 
         (async () => {
             // Fetch User Details for Reporter Name (fallback to email)
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user) {
-                setReporterName(user.user_metadata?.full_name || user.email || '')
+            const { data: { session } } = await supabase.auth.getSession()
+            if (session?.user) {
+                setReporterName(session.user.user_metadata?.full_name || session.user.email || '')
             }
 
             // 1. Check if GPS is on
@@ -190,9 +190,9 @@ export default function ReportForm({ userId }: ReportFormProps) {
 
         let finalReporter = reporterName
         try {
-            const { data: { user } } = await supabase.auth.getUser()
+            const { data: { session } } = await supabase.auth.getSession()
             if (!finalReporter) {
-                finalReporter = user?.user_metadata?.full_name || user?.email || 'Anonymous'
+                finalReporter = session?.user?.user_metadata?.full_name || session?.user?.email || 'Anonymous'
             }
         } catch (e) { }
 
