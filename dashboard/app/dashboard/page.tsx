@@ -20,6 +20,15 @@ export default function DashboardPage() {
   const [filterType, setFilterType] = useState<string>("all");
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
   const [sortBy, setSortBy] = useState<"time" | "severity" | "type">("time");
+  const [focusLocation, setFocusLocation] = useState<{ lat: number; lng: number } | null>(null);
+
+  const handleShowOnMap = (lat: number, lng: number) => {
+    setSelectedIncident(null);
+    // Timeout to allow drawer to close before flying (optional, but smoother)
+    setTimeout(() => {
+      setFocusLocation({ lat, lng });
+    }, 100);
+  };
 
   console.log("[DashboardPage] Rendering - incidents:", incidents.length, "isReady:", isReady);
 
@@ -46,16 +55,16 @@ export default function DashboardPage() {
     const fetchIncidents = async () => {
       try {
         console.log("fetchIncidents() called at", new Date().toISOString());
-        
+
         // First, try a simple query to see if we can access the table at all
         console.log("Testing basic access to reports table...");
         const testQuery = await supabase
           .from("reports")
           .select("id")
           .limit(1);
-        
+
         console.log("Test query result:", testQuery);
-        
+
         // Now do the full query
         let { data, error } = await supabase
           .from("reports")
@@ -130,7 +139,7 @@ export default function DashboardPage() {
 
             const latitudeOk = typeof row.latitude === "number";
             const longitudeOk = typeof row.longitude === "number";
-            
+
             if (!latitudeOk || !longitudeOk) {
               console.warn("Skipping row - missing coordinates:", {
                 id: row.id,
@@ -199,7 +208,7 @@ export default function DashboardPage() {
 
   const total = incidents.length;
   const critical = incidents.filter((i) => i.severity === 1).length;
-  const pending = incidents.filter((i) => i.status === "Pending Sync").length;
+
 
   // Apply filters and sorting
   const filteredIncidents = incidents
@@ -255,16 +264,15 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <StatCard label="Total incidents" value={total.toString()} />
         <StatCard label="Critical (S1)" value={critical.toString()} />
-        <StatCard label="Pending sync" value={pending.toString()} />
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         <div className="lg:col-span-2">
           <div className="h-[378px] bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-            <IncidentMap incidents={incidents} />
+            <IncidentMap incidents={incidents} focusLocation={focusLocation} />
           </div>
           <div className="mt-4 bg-slate-900 rounded-xl border border-slate-800 p-4">
             <h3 className="text-sm font-semibold text-slate-200 mb-3">Severity Levels</h3>
@@ -328,17 +336,18 @@ export default function DashboardPage() {
             <p className="text-xs text-slate-400">Showing {filteredIncidents.length} of {incidents.length} incidents</p>
           </div>
           <div className="flex-1 overflow-auto">
-            <IncidentTable 
-              incidents={filteredIncidents} 
+            <IncidentTable
+              incidents={filteredIncidents}
               onSelectIncident={setSelectedIncident}
             />
           </div>
         </div>
       </section>
 
-      <IncidentDetail 
+      <IncidentDetail
         incident={selectedIncident}
         onClose={() => setSelectedIncident(null)}
+        onShowOnMap={handleShowOnMap}
       />
     </div>
   );

@@ -15,6 +15,13 @@ const TileLayer = dynamic(
   () => import("react-leaflet").then((mod) => mod.TileLayer),
   { ssr: false }
 );
+// We can't use dynamic import for useMap hook directly inside the component in the same way,
+// but since we are inside a client component and MapUpdater is child of MapContainer, 
+// we need to access 'useMap' from 'react-leaflet'. 
+// However, since 'react-leaflet' is being imported dynamically for the components, 
+// using the hook might be tricky if not imported standardly. 
+// Let's try standard import for the hook since it's just a function.
+import { useMap } from "react-leaflet";
 const Marker = dynamic(
   () => import("react-leaflet").then((mod) => mod.Marker),
   { ssr: false }
@@ -40,26 +47,26 @@ function getIconBySeverity(severity: number | null) {
   if (typeof window === "undefined" || !DefaultIcon) {
     return undefined;
   }
-  
+
   // Default to severity 3 (yellow) if not specified
   const level = severity ?? 3;
   const clampedLevel = Math.max(1, Math.min(5, level));
-  
+
   // Return cached icon if it exists
   if (IconCache[clampedLevel]) {
     return IconCache[clampedLevel];
   }
-  
+
   try {
     const L = require("leaflet");
     const color = SEVERITY_COLORS[clampedLevel as keyof typeof SEVERITY_COLORS];
-    
+
     // Create SVG as a compact string without extra whitespace
     const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 41"><path d="M12.5 0C5.59 0 0 5.59 0 12.5c0 8.75 12.5 28.75 12.5 28.75S25 21.25 25 12.5C25 5.59 19.41 0 12.5 0z" fill="${color.hex}"/><circle cx="12.5" cy="12.5" r="5" fill="white"/></svg>`;
-    
+
     // Use btoa for reliable data URL encoding
     const encoded = "data:image/svg+xml;base64," + btoa(svgString);
-    
+
     const icon = L.icon({
       iconUrl: encoded,
       iconSize: [25, 41],
@@ -68,7 +75,7 @@ function getIconBySeverity(severity: number | null) {
       shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
       shadowSize: [41, 41],
     });
-    
+
     IconCache[clampedLevel] = icon;
     return icon;
   } catch (err) {
@@ -86,10 +93,10 @@ function getDefaultIcon() {
 
 function initializeLeaflet() {
   if (leafletInitialized || typeof window === "undefined") return;
-  
+
   try {
     const L = require("leaflet");
-    
+
     // Create a default icon synchronously
     DefaultIcon = L.icon({
       iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -100,26 +107,48 @@ function initializeLeaflet() {
       popupAnchor: [1, -34],
       shadowSize: [41, 41],
     });
-    
+
     leafletInitialized = true;
   } catch (err) {
     console.error("Failed to initialize Leaflet icon:", err);
   }
 }
 
-export default function IncidentMap({ incidents }: { incidents: Incident[] }) {
+// Internal component to handle map movements
+function MapUpdater({ center, zoom }: { center: [number, number]; zoom?: number }) {
+  const map = useMap(); // requires 'react-leaflet' import, checking if I need to import it
+
+  useEffect(() => {
+    if (center) {
+      map.flyTo(center, zoom ?? 14, {
+        animate: true,
+        duration: 1.5,
+      });
+    }
+  }, [center, zoom, map]);
+
+  return null;
+}
+
+export default function IncidentMap({
+  incidents,
+  focusLocation
+}: {
+  incidents: Incident[],
+  focusLocation?: { lat: number, lng: number } | null
+}) {
   const [mounted, setMounted] = useState(false);
-  
+
   useEffect(() => {
     initializeLeaflet();
     setMounted(true);
   }, []);
-  
+
   if (!mounted) return <div className="w-full h-full bg-slate-800" />;
   const defaultCenter: [number, number] = [6.705, 80.384]; // Ratnapura-ish
   const center: [number, number] =
     incidents.length > 0
-      ? ([incidents[0].latitude, incidents[0].longitude] as [number, number])
+      ? ([incidents[0].latitude ?? 0, incidents[0].longitude ?? 0] as [number, number])
       : defaultCenter;
 
   return (
@@ -133,6 +162,9 @@ export default function IncidentMap({ incidents }: { incidents: Incident[] }) {
         attribution="&copy; OpenStreetMap contributors"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      {focusLocation && (
+        <MapUpdater center={[focusLocation.lat, focusLocation.lng]} zoom={15} />
+      )}
       {incidents.map((inc) => (
         <Marker
           key={inc.id}

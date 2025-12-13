@@ -4,9 +4,11 @@ import { getIncidentTypeName } from "@/lib/incidentTypes";
 export default function IncidentDetail({
   incident,
   onClose,
+  onShowOnMap,
 }: {
   incident: Incident | null;
   onClose: () => void;
+  onShowOnMap: (lat: number, lng: number) => void;
 }) {
   if (!incident) return null;
 
@@ -111,9 +113,8 @@ export default function IncidentDetail({
             <p className="text-xs text-slate-500 mb-1">Sync Status</p>
             <div className="flex items-center gap-2">
               <div
-                className={`w-2 h-2 rounded-full ${
-                  incident.synced ? "bg-emerald-500" : "bg-amber-500"
-                }`}
+                className={`w-2 h-2 rounded-full ${incident.synced ? "bg-emerald-500" : "bg-amber-500"
+                  }`}
               />
               <span className="text-sm text-slate-300">{incident.status}</span>
             </div>
@@ -186,10 +187,20 @@ export default function IncidentDetail({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-800">
+        <div className="p-4 border-t border-slate-800 flex gap-3">
+          <button
+            onClick={() => {
+              if (incident.latitude && incident.longitude) {
+                onShowOnMap(incident.latitude, incident.longitude);
+              }
+            }}
+            className="flex-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 rounded text-sm text-white transition font-medium"
+          >
+            Show on Map
+          </button>
           <button
             onClick={onClose}
-            className="w-full px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded text-sm text-slate-300 transition"
+            className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded text-sm text-slate-300 transition"
           >
             Close
           </button>
