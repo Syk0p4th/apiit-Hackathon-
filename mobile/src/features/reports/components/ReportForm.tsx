@@ -23,6 +23,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
                     report.title = title
                     report.description = description
                     report.userId = userId
+                    report.createdAt = new Date()
                 })
             })
             setStatus('Saved Offline')
