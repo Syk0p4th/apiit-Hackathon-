@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import type { Incident } from "@/types/incident";
-import { getSupabaseClient } from "@/lib/superbaseClient";
+import { getSupabaseClient } from "@/lib/supabaseClient";
 import IncidentMap from "../components/IncidentMap";
 import IncidentTable from "../components/IncidentTable";
 
-export const dynamic = "force-dynamic";
+// NOTE: Do NOT export `dynamic` from a client component/page.
+// export const dynamic = "force-dynamic";
 
 export default function DashboardPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -26,36 +27,84 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // Poll Supabase directly every 10s
+  // Fetch + auto-update (realtime) + polling fallback
   useEffect(() => {
+    const supabase = getSupabaseClient();
+    if (!supabase) {
+      console.warn("Supabase client not initialized - environment variables missing");
+      setIsReady(true);
+      return;
+    }
+
+    let cancelled = false;
+
     const fetchIncidents = async () => {
-      const supabase = getSupabaseClient();
-      if (!supabase) {
-        console.warn("Supabase client not initialized - environment variables missing");
-        return;
-      }
-      
       const { data, error } = await supabase
-        .from("incidents") // table name your teammate created
-        .select("*")
-        .order("timestamp", { ascending: false });
+        .from("reports")
+        .select(
+          [
+            "id",
+            "title",
+            "description",
+            "reporter_name",
+            "incident_type",
+            "severity",
+            "incident_time",
+            "latitude",
+            "longitude",
+            "synced",
+            "sync_attempts",
+            "created_at",
+            "updated_at",
+            "user_id",
+          ].join(",")
+        )
+        .order("incident_time", { ascending: false });
+
+      if (cancelled) return;
 
       if (error) {
         console.error("Supabase fetch error:", error);
+        setIsReady(true);
         return;
       }
 
-      const mapped: Incident[] =
-        data?.map((row: any) => ({
-          id: row.id,
-          incidentType: row.incident_type,
-          severity: row.severity,
-          latitude: row.latitude,
-          longitude: row.longitude,
-          timestamp: row.timestamp,
-          photoUrl: row.photo_url ?? undefined,
-          status: (row.status as "Pending Sync" | "Synced") ?? "Synced",
-        })) ?? [];
+      const mapped: Incident[] = (data ?? [])
+        .map((row: any) => {
+          const incidentTime = row.incident_time ?? null;
+          const createdAt = row.created_at ?? null;
+          const timestamp = (incidentTime || createdAt || "") as string;
+
+          const latitudeOk = typeof row.latitude === "number";
+          const longitudeOk = typeof row.longitude === "number";
+          if (!latitudeOk || !longitudeOk) return null; // skip rows without coordinates
+
+          const synced = Boolean(row.synced ?? false);
+
+          const incident: Incident = {
+            id: String(row.id),
+            title: row.title ?? null,
+            description: row.description ?? null,
+            reporterName: row.reporter_name ?? null,
+            incidentType: typeof row.incident_type === "number" ? row.incident_type : row.incident_type ?? null,
+            severity: typeof row.severity === "number" ? row.severity : row.severity ?? null,
+            incidentTime,
+            latitude: row.latitude, // number (guarded above)
+            longitude: row.longitude, // number (guarded above)
+            synced,
+            syncAttempts: typeof row.sync_attempts === "number" ? row.sync_attempts : row.sync_attempts ?? null,
+            createdAt,
+            updatedAt: row.updated_at ?? null,
+            userId: row.user_id ?? null,
+
+            // UI fields
+            timestamp,
+            status: synced ? "Synced" : "Pending Sync",
+          };
+
+          return incident;
+        })
+        .filter(Boolean) as Incident[];
 
       setIncidents(mapped);
       setIsReady(true);
@@ -63,12 +112,34 @@ export default function DashboardPage() {
 
     fetchIncidents();
     const interval = setInterval(fetchIncidents, 10_000);
-    return () => clearInterval(interval);
+
+    const channel = supabase
+      .channel("reports-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "reports" }, () => {
+        fetchIncidents();
+      })
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      // safer cleanup in v2
+      channel.unsubscribe();
+    };
   }, []);
 
   const total = incidents.length;
   const critical = incidents.filter((i) => i.severity === 1).length;
   const pending = incidents.filter((i) => i.status === "Pending Sync").length;
+
+  if (!isReady) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Incidents Overview</h2>
+        <div className="text-sm text-slate-400">Loading reports…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

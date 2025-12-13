@@ -23,6 +23,7 @@ export function getSupabaseClient() {
   }
   
   supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
+  console.log(supabaseInstance)
   return supabaseInstance;
 }
 
