@@ -11,10 +11,10 @@ function formatDateTime(value?: string | null) {
   return d.toLocaleString();
 }
 
-export default function IncidentTable({ 
+export default function IncidentTable({
   incidents,
-  onSelectIncident 
-}: { 
+  onSelectIncident
+}: {
   incidents: Incident[];
   onSelectIncident?: (incident: Incident) => void;
 }) {
@@ -41,8 +41,8 @@ export default function IncidentTable({
 
           <tbody className="text-slate-200">
             {incidents.map((i) => (
-              <tr 
-                key={i.id} 
+              <tr
+                key={i.id}
                 className="border-b border-slate-800/70 hover:bg-slate-800/30 cursor-pointer transition"
                 onClick={() => onSelectIncident?.(i)}
               >
@@ -54,7 +54,26 @@ export default function IncidentTable({
                 </td>
                 <td className="py-2 pr-3">{i.reporterName ?? "-"}</td>
                 <td className="py-2 pr-3">{getIncidentTypeName(i.incidentType)}</td>
-                <td className="py-2 pr-3">{i.severity ?? "-"}</td>
+                <td className="py-2 pr-3">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{
+                        backgroundColor:
+                          i.severity === 5
+                            ? "#ef4444"
+                            : i.severity === 4
+                              ? "#f97316"
+                              : i.severity === 3
+                                ? "#eab308"
+                                : i.severity === 2
+                                  ? "#3b82f6"
+                                  : "#22c55e",
+                      }}
+                    />
+                    {i.severity ?? "-"}
+                  </div>
+                </td>
                 <td className="py-2 pr-3">{formatDateTime(i.incidentTime ?? i.timestamp)}</td>
                 <td className="py-2 pr-3">
                   <span

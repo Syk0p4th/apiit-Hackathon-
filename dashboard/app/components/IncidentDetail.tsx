@@ -67,9 +67,9 @@ export default function IncidentDetail({
                 className="w-3 h-3 rounded-full"
                 style={{
                   backgroundColor:
-                    incident.severity === 4
+                    incident.severity === 5
                       ? "#ef4444"
-                      : incident.severity === 5
+                      : incident.severity === 4
                         ? "#f97316"
                         : incident.severity === 3
                           ? "#eab308"

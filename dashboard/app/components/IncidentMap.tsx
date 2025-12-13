@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import type { Incident } from "@/types/incident";
 import { useEffect, useState } from "react";
 import { getIncidentTypeName } from "@/lib/incidentTypes";
+import DangerZoneLayer from "./DangerZoneLayer";
 import "leaflet/dist/leaflet.css";
 
 const MapContainer = dynamic(
@@ -165,6 +166,7 @@ export default function IncidentMap({
       {focusLocation && (
         <MapUpdater center={[focusLocation.lat, focusLocation.lng]} zoom={15} />
       )}
+      <DangerZoneLayer incidents={incidents} />
       {incidents.map((inc) => (
         <Marker
           key={inc.id}
