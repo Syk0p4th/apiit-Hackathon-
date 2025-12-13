@@ -294,8 +294,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
             <TypeSelector />
             <SeveritySelector />
 
-            <TypeSelector />
-            <SeveritySelector />
+
 
             <View style={styles.locationContainer}>
                 <Text style={styles.label}>Location ({isOnline ? 'Online - Tap Map to Move' : 'Offline - GPS Only'}):</Text>
