@@ -35,11 +35,12 @@ export default function App() {
         // Auth Listener
         const checkSession = async () => {
             try {
-                // getSession reads from local storage (fast & offline friendly)
+                console.log('[App] Checking session...')
                 const { data: { session } } = await supabase.auth.getSession()
+                console.log('[App] Session found:', !!session)
                 setSession(session)
             } catch (error) {
-                console.log('Error loading session:', error)
+                console.log('[App] Error loading session:', error)
             } finally {
                 setIsLoading(false)
             }

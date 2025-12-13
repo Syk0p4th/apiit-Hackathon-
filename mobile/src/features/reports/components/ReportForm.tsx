@@ -167,6 +167,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
                     report.userId = userId
                     report.latitude = finalLocation!.lat // We checked it's not null/undefined or returned
                     report.longitude = finalLocation!.lng
+                    report.images = []
                     report.createdAt = new Date()
                     report.synced = false
                 })

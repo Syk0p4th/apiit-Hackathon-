@@ -8,7 +8,7 @@ export function useAutoSync(): string {
 
     const triggerSync = async () => {
         const state = await NetInfo.fetch()
-        if (state.isConnected && state.isInternetReachable !== false) {
+        if (state.isConnected) {
             console.log('[AutoSync] Network detected. Triggering sync...')
             setSyncStatus('Syncing...')
             try {
