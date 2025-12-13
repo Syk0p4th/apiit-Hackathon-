@@ -1,6 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { View, TextInput, Button, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native'
 import { LeafletView } from 'react-native-leaflet-view'
+import { WebView } from 'react-native-webview'
+import * as Location from 'expo-location'
 import database from '../../../services/database'
 import 'react-native-get-random-values'
 import Report from '../models/Report'
@@ -8,6 +10,48 @@ import Report from '../models/Report'
 interface ReportFormProps {
     userId: string
 }
+
+const getMapHtml = (location: { lat: number; lng: number } | null) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { width: 100%; height: 100vh; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        var map = L.map('map').setView([${location ? location.lat : 6.9271}, ${location ? location.lng : 79.8612}], 13);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+
+        ${location ? `L.marker([${location.lat}, ${location.lng}]).addTo(map);` : ''}
+
+        map.on('click', function(e) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'click',
+                payload: { lat: e.latlng.lat, lng: e.latlng.lng }
+            }));
+            
+            // Clear existing markers and add new one
+            map.eachLayer(function (layer) {
+                if (layer instanceof L.Marker) {
+                    map.removeLayer(layer);
+                }
+            });
+            L.marker(e.latlng).addTo(map);
+        });
+    </script>
+</body>
+</html>
+`
 
 const INCIDENT_TYPES = [
     { label: 'Flooding', value: 1 },
@@ -31,10 +75,56 @@ export default function ReportForm({ userId }: ReportFormProps) {
     const [severity, setSeverity] = useState<number>(2)
     const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
 
+    useEffect(() => {
+        (async () => {
+            const { status } = await Location.requestForegroundPermissionsAsync()
+            if (status !== 'granted') {
+                return
+            }
+
+            const location = await Location.getCurrentPositionAsync({})
+            setLocation({
+                lat: location.coords.latitude,
+                lng: location.coords.longitude,
+            })
+        })()
+    }, [])
+
     const [status, setStatus] = useState<string>('')
 
     const handleSave = async () => {
-        if (!title || !description || !location) return
+        if (!title || !description) {
+            setStatus('Title and Description are required')
+            return
+        }
+
+        let finalLocation = location
+
+        if (!finalLocation) {
+            try {
+                setStatus('Getting location...')
+                const { status } = await Location.requestForegroundPermissionsAsync()
+                if (status !== 'granted') {
+                    setStatus('Permission to access location was denied')
+                    return
+                }
+
+                const location = await Location.getCurrentPositionAsync({})
+                finalLocation = {
+                    lat: location.coords.latitude,
+                    lng: location.coords.longitude,
+                }
+            } catch (error) {
+                console.error(error)
+                setStatus('Error fetching location')
+                return
+            }
+        }
+
+        if (!finalLocation) {
+            setStatus('Could not determine location')
+            return
+        }
 
         try {
             await database.write(async () => {
@@ -47,8 +137,8 @@ export default function ReportForm({ userId }: ReportFormProps) {
                     report.severity = severity
                     report.incidentTime = new Date() // Default to now for incident time
                     report.userId = userId
-                    report.latitude = location.lat
-                    report.longitude = location.lng
+                    report.latitude = finalLocation!.lat
+                    report.longitude = finalLocation!.lng
                     report.createdAt = new Date()
                     report.synced = false
                 })
@@ -132,30 +222,21 @@ export default function ReportForm({ userId }: ReportFormProps) {
             <SeveritySelector />
 
             <View style={styles.mapContainer}>
-                <LeafletView
-                    mapCenterPosition={{
-                        lat: 6.9271,   // Colombo default
-                        lng: 79.8612,
-                    }}
-                    zoom={13}
-                    onMessageReceived={(event: any) => {
-                        console.log('Leaflet Message:', event)
-                        if (event.event === 'onMapClicked' && event.payload?.touchLatLng) {
-                            const { lat, lng } = event.payload.touchLatLng
-                            setLocation({ lat, lng })
+                <WebView
+                    originWhitelist={['*']}
+                    source={{ html: getMapHtml(location) }}
+                    onMessage={(event) => {
+                        if (event.nativeEvent.data) {
+                            try {
+                                const data = JSON.parse(event.nativeEvent.data);
+                                if (data.type === 'click') {
+                                    setLocation(data.payload);
+                                }
+                            } catch (e) {
+                                console.error('Map message error:', e);
+                            }
                         }
                     }}
-                    mapMarkers={
-                        location
-                            ? [
-                                {
-                                    id: 'selected-location',
-                                    position: location,
-                                    icon: '📍',
-                                },
-                            ]
-                            : []
-                    }
                 />
             </View>
 
