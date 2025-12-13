@@ -15,7 +15,6 @@ import ReportForm from './src/features/reports/components/ReportForm'
 import ReportList from './src/features/reports/components/ReportList'
 import AuthScreen from './src/features/auth/components/AuthScreen'
 import { useAutoSync } from './src/shared/hooks/useAutoSync'
-import { sync } from './src/services/database/sync'
 import { supabase } from './src/services/api/supabase'
 
 export default function App() {
@@ -89,7 +88,6 @@ export default function App() {
                             </View>
 
                             <View style={{ marginTop: 10, flexDirection: 'row', gap: 10 }}>
-                                <Button title="Sync Now" onPress={() => sync()} />
                                 <Button title="Sign Out" onPress={() => supabase.auth.signOut()} color="red" />
                             </View>
                         </View>
