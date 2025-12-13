@@ -36,6 +36,8 @@ export default function ReportForm({ userId }: ReportFormProps) {
     const [status, setStatus] = useState<string>('')
 
     useEffect(() => {
+        let subscription: Location.LocationSubscription | null = null;
+
         (async () => {
             // 1. Check if GPS is on
             const servicesEnabled = await Location.hasServicesEnabledAsync()
@@ -51,30 +53,38 @@ export default function ReportForm({ userId }: ReportFormProps) {
                 return
             }
 
+            setPermissionStatus('Locating...')
+
             try {
-                // 3. Try Last Known Location (Fastest)
-                let loc = await Location.getLastKnownPositionAsync({})
-
-                // 4. If no last known, try current (Slower)
-                if (!loc) {
-                    loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
-                }
-
-                if (loc) {
-                    setLocation({
-                        lat: loc.coords.latitude,
-                        lng: loc.coords.longitude,
-                    })
-                    fetchAddress(loc.coords.latitude, loc.coords.longitude)
-                } else {
-                    setPermissionStatus('Waiting for GPS...')
-                }
-
+                // 3. Start watching position (Real-time)
+                subscription = await Location.watchPositionAsync(
+                    {
+                        accuracy: Location.Accuracy.High,
+                        distanceInterval: 5, // Update every 5 meters
+                        timeInterval: 2000   // Minimum time interval of 2 seconds
+                    },
+                    (newLoc) => {
+                        setLocation({
+                            lat: newLoc.coords.latitude,
+                            lng: newLoc.coords.longitude,
+                        })
+                        setPermissionStatus('')
+                        // Optional: Debounce this if needed, but for now we update address on move
+                        fetchAddress(newLoc.coords.latitude, newLoc.coords.longitude)
+                    }
+                )
             } catch (e) {
-                console.log('Error fetching location:', e)
+                console.log('Error watching location:', e)
                 setPermissionStatus('GPS Signal Weak')
             }
         })()
+
+        // Cleanup subscription on unmount
+        return () => {
+            if (subscription) {
+                subscription.remove()
+            }
+        }
     }, [])
 
     const fetchAddress = async (lat: number, lng: number) => {
