@@ -70,16 +70,16 @@ export async function sync() {
                     id: record.id,
                     title: record.title,
                     description: record.description,
-                    reporter_name: record.reporterName,
-                    incident_type: record.incidentType,
+                    reporter_name: record.reporter_name, // Raw record uses snake_case schema names
+                    incident_type: record.incident_type,
                     severity: record.severity,
-                    incident_time: safeDate(record.incidentTime),
+                    incident_time: safeDate(record.incident_time),
                     latitude: record.latitude,
                     longitude: record.longitude,
-                    created_at: safeDate(record.createdAt),
-                    updated_at: new Date().toISOString(), // Always update timestamp on push
-                    user_id: currentUserId || record.userId,
-                    sync_attempts: (record.syncAttempts || 0) + 1
+                    created_at: safeDate(record.created_at),
+                    updated_at: new Date().toISOString(),
+                    user_id: currentUserId || record.user_id,
+                    sync_attempts: (record.sync_attempts || 0) + 1
                 })
 
                 // Handle created records
