@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { View, TextInput, Button, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native'
+import { LeafletView } from 'react-native-leaflet-view'
 import database from '../../../services/database'
 import 'react-native-get-random-values'
 import Report from '../models/Report'
@@ -28,11 +29,12 @@ export default function ReportForm({ userId }: ReportFormProps) {
     const [reporterName, setReporterName] = useState<string>('')
     const [incidentType, setIncidentType] = useState<number>(1)
     const [severity, setSeverity] = useState<number>(2)
+    const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
 
     const [status, setStatus] = useState<string>('')
 
     const handleSave = async () => {
-        if (!title || !description) return
+        if (!title || !description || !location) return
 
         try {
             await database.write(async () => {
@@ -45,6 +47,8 @@ export default function ReportForm({ userId }: ReportFormProps) {
                     report.severity = severity
                     report.incidentTime = new Date() // Default to now for incident time
                     report.userId = userId
+                    report.latitude = location.lat
+                    report.longitude = location.lng
                     report.createdAt = new Date()
                     report.synced = false
                 })
@@ -56,6 +60,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
             setReporterName('')
             setIncidentType(1)
             setSeverity(2)
+            setLocation(null)
 
             setTimeout(() => setStatus(''), 3000)
         } catch (e) {
@@ -126,6 +131,34 @@ export default function ReportForm({ userId }: ReportFormProps) {
             <TypeSelector />
             <SeveritySelector />
 
+            <View style={styles.mapContainer}>
+                <LeafletView
+                    mapCenterPosition={{
+                        lat: 6.9271,   // Colombo default
+                        lng: 79.8612,
+                    }}
+                    zoom={13}
+                    onMessageReceived={(event: any) => {
+                        console.log('Leaflet Message:', event)
+                        if (event.event === 'onMapClicked' && event.payload?.touchLatLng) {
+                            const { lat, lng } = event.payload.touchLatLng
+                            setLocation({ lat, lng })
+                        }
+                    }}
+                    mapMarkers={
+                        location
+                            ? [
+                                {
+                                    id: 'selected-location',
+                                    position: location,
+                                    icon: '📍',
+                                },
+                            ]
+                            : []
+                    }
+                />
+            </View>
+
             <View style={{ marginTop: 20 }}>
                 <Button title="Save Report" onPress={handleSave} />
             </View>
@@ -138,6 +171,12 @@ const styles = StyleSheet.create({
     container: { padding: 20 },
     header: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
     input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 5, padding: 10, marginBottom: 15, backgroundColor: '#fff' },
+    mapContainer: {
+        height: 250,
+        marginBottom: 20,
+        borderRadius: 10,
+        overflow: 'hidden',
+    },
     status: { marginTop: 15, fontSize: 16, color: 'blue', textAlign: 'center' },
 
     selectorContainer: { marginBottom: 15 },
