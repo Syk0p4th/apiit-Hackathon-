@@ -4,6 +4,7 @@ import * as Location from 'expo-location'
 import { WebView } from 'react-native-webview'
 import { useNetInfo } from '@react-native-community/netinfo'
 import database from '../../../services/database'
+import { sync } from '../../../services/database/sync'
 import { supabase } from '../../../services/api/supabase'
 import 'react-native-get-random-values'
 import Report from '../models/Report'
@@ -209,7 +210,22 @@ export default function ReportForm({ userId }: ReportFormProps) {
                     report.synced = false
                 })
             })
-            setStatus('Saved Offline')
+
+            setStatus('Saved Locally')
+
+            if (isOnline) {
+                setStatus('Syncing...')
+                try {
+                    await sync()
+                    setStatus('Saved & Synced! ☁️')
+                } catch (err) {
+                    console.warn('Immediate sync failed:', err)
+                    setStatus('Saved (Sync Pending) ⏳')
+                }
+            } else {
+                setStatus('Saved Offline 📡')
+            }
+
             // Reset form
             setTitle('')
             setDescription('')
@@ -218,9 +234,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
             setSeverity(2)
             setImages([])
             // setLocation(null) 
-            // setAddress('') // Keep address visible or clear? Let's clear to avoid stale info if they move significantly, but useEffect only runs once. 
-            // Actually, if we clear, the next report won't have it unless we re-fetch.
-            // Let's keep it for now.
+            // setAddress('') 
 
             setTimeout(() => setStatus(''), 3000)
         } catch (e) {
