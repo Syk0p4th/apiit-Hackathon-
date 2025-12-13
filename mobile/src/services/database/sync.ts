@@ -50,6 +50,7 @@ export async function sync() {
                             longitude: row.longitude,
                             created_at: new Date(safeDate(row.created_at)).getTime(),
                             user_id: row.user_id,
+                            images: row.images ? JSON.stringify(row.images) : '[]', // Supabase (Array) -> Local (String)
                             synced: true,
                             sync_attempts: row.sync_attempts
                         })),
@@ -76,6 +77,7 @@ export async function sync() {
                     incident_time: safeDate(record.incident_time),
                     latitude: record.latitude,
                     longitude: record.longitude,
+                    images: record.images ? JSON.parse(record.images) : [], // Local (String) -> Supabase (Array)
                     created_at: safeDate(record.created_at),
                     updated_at: new Date().toISOString(),
                     user_id: currentUserId || record.user_id,
