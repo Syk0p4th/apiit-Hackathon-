@@ -8,16 +8,19 @@ export function useAutoSync(): string {
 
     const triggerSync = async () => {
         const state = await NetInfo.fetch()
-        if (state.isConnected) {
+        if (state.isConnected && state.isInternetReachable !== false) {
+            console.log('[AutoSync] Network detected. Triggering sync...')
             setSyncStatus('Syncing...')
             try {
                 await sync()
                 setSyncStatus('Synced')
+                console.log('[AutoSync] Sync complete.')
             } catch (err) {
-                console.warn('Sync failed:', err)
+                console.warn('[AutoSync] Sync failed:', err)
                 setSyncStatus('Sync Failed')
             }
         } else {
+            console.log('[AutoSync] Offline or No Internet.')
             setSyncStatus('Offline')
         }
     }
@@ -28,6 +31,7 @@ export function useAutoSync(): string {
 
         // 2. Listen for Network Changes
         const unsubscribeNet = NetInfo.addEventListener((state: NetInfoState) => {
+            console.log('[AutoSync] NetInfo Change:', state.isConnected)
             if (state.isConnected) {
                 triggerSync()
             } else {
@@ -38,6 +42,7 @@ export function useAutoSync(): string {
         // 3. Listen for AppState Changes (Background -> Foreground)
         const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
             if (nextAppState === 'active') {
+                console.log('[AutoSync] App Foregrounded. Checking sync...')
                 triggerSync()
             }
         })
