@@ -10,6 +10,7 @@ import {
 import NetInfo from '@react-native-community/netinfo'
 import ReportForm from './src/features/reports/components/ReportForm'
 import { useAutoSync } from './src/shared/hooks/useAutoSync'
+import ReportList from './src/features/reports/components/ReportList'
 
 export default function App() {
     const syncStatus = useAutoSync()
@@ -59,6 +60,7 @@ export default function App() {
             </View>
 
             <ReportForm />
+            <ReportList />
         </SafeAreaView>
     )
 }
