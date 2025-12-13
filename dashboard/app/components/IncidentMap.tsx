@@ -70,7 +70,7 @@ export default function IncidentMap({ incidents }: { incidents: Incident[] }) {
       {incidents.map((inc) => (
         <Marker
           key={inc.id}
-          position={[inc.latitude, inc.longitude]}
+          position={[inc.latitude || 0, inc.longitude || 0]}
         >
           <Popup>
             <div className="text-xs">

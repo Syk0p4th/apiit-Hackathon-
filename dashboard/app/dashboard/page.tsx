@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Incident } from "@/types/incident";
-import { getSupabaseClient } from "@/lib/supabaseClient";
+import { supabase } from "@/lib/supabaseClient";
 import IncidentMap from "../components/IncidentMap";
 import IncidentTable from "../components/IncidentTable";
 
@@ -13,6 +13,8 @@ export default function DashboardPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [isOnline, setIsOnline] = useState(true);
   const [isReady, setIsReady] = useState(false);
+
+  console.log("[DashboardPage] Rendering - incidents:", incidents.length, "isReady:", isReady);
 
   // Online / offline badge
   useEffect(() => {
@@ -29,87 +31,116 @@ export default function DashboardPage() {
 
   // Fetch + auto-update (realtime) + polling fallback
   useEffect(() => {
-    const supabase = getSupabaseClient();
-    if (!supabase) {
-      console.warn("Supabase client not initialized - environment variables missing");
-      setIsReady(true);
-      return;
-    }
+    console.log("=== Dashboard useEffect starting ===");
+    console.log("Supabase client available?", !!supabase);
 
     let cancelled = false;
 
     const fetchIncidents = async () => {
-      const { data, error } = await supabase
-        .from("reports")
-        .select(
-          [
-            "id",
-            "title",
-            "description",
-            "reporter_name",
-            "incident_type",
-            "severity",
-            "incident_time",
-            "latitude",
-            "longitude",
-            "synced",
-            "sync_attempts",
-            "created_at",
-            "updated_at",
-            "user_id",
-          ].join(",")
-        )
-        .order("incident_time", { ascending: false });
+      try {
+        console.log("fetchIncidents() called at", new Date().toISOString());
+        
+        // First, try a simple query to see if we can access the table at all
+        console.log("Testing basic access to reports table...");
+        const testQuery = await supabase
+          .from("reports")
+          .select("id")
+          .limit(1);
+        
+        console.log("Test query result:", testQuery);
+        
+        // Now do the full query
+        const { data, error } = await supabase
+          .from("reports")
+          .select(
+            [
+              "id",
+              "title",
+              "description",
+              "reporter_name",
+              "incident_type",
+              "severity",
+              "incident_time",
+              "latitude",
+              "longitude",
+              "synced",
+              "sync_attempts",
+              "created_at",
+              "updated_at",
+              "user_id",
+            ].join(",")
+          )
+          .order("incident_time", { ascending: false });
 
-      if (cancelled) return;
+        if (cancelled) return;
 
-      if (error) {
-        console.error("Supabase fetch error:", error);
+        if (error) {
+          console.error("Supabase fetch error:", error);
+          console.error("Error code:", error.code);
+          console.error("Error message:", error.message);
+          console.error("Error details:", error.details);
+          setIsReady(true);
+          return;
+        }
+
+        console.log("Raw data from Supabase (reports table):", data);
+        console.log("Total records fetched:", data?.length ?? 0);
+
+        const mapped: Incident[] = (data ?? [])
+          .map((row: any) => {
+            const incidentTime = row.incident_time ?? null;
+            const createdAt = row.created_at ?? null;
+            const timestamp = (incidentTime || createdAt || "") as string;
+
+            const latitudeOk = typeof row.latitude === "number";
+            const longitudeOk = typeof row.longitude === "number";
+            
+            if (!latitudeOk || !longitudeOk) {
+              console.warn("Skipping row - missing coordinates:", {
+                id: row.id,
+                latitude: row.latitude,
+                longitude: row.longitude,
+              });
+              return null;
+            }
+
+            const synced = Boolean(row.synced ?? false);
+
+            const incident: Incident = {
+              id: String(row.id),
+              title: row.title ?? null,
+              description: row.description ?? null,
+              reporterName: row.reporter_name ?? null,
+              incidentType: typeof row.incident_type === "number" ? row.incident_type : row.incident_type ?? null,
+              severity: typeof row.severity === "number" ? row.severity : row.severity ?? null,
+              incidentTime,
+              latitude: row.latitude, // number (guarded above)
+              longitude: row.longitude, // number (guarded above)
+              synced,
+              syncAttempts: typeof row.sync_attempts === "number" ? row.sync_attempts : row.sync_attempts ?? null,
+              createdAt,
+              updatedAt: row.updated_at ?? null,
+              userId: row.user_id ?? null,
+
+              // UI fields
+              timestamp,
+              status: synced ? "Synced" : "Pending Sync",
+            };
+
+            return incident;
+          })
+          .filter(Boolean) as Incident[];
+
+        console.log("Mapped incidents (after filtering):", mapped);
+        setIncidents(mapped);
         setIsReady(true);
-        return;
+      } catch (err) {
+        console.error("Exception during fetchIncidents:", err);
+        setIsReady(true);
       }
-
-      const mapped: Incident[] = (data ?? [])
-        .map((row: any) => {
-          const incidentTime = row.incident_time ?? null;
-          const createdAt = row.created_at ?? null;
-          const timestamp = (incidentTime || createdAt || "") as string;
-
-          const latitudeOk = typeof row.latitude === "number";
-          const longitudeOk = typeof row.longitude === "number";
-          if (!latitudeOk || !longitudeOk) return null; // skip rows without coordinates
-
-          const synced = Boolean(row.synced ?? false);
-
-          const incident: Incident = {
-            id: String(row.id),
-            title: row.title ?? null,
-            description: row.description ?? null,
-            reporterName: row.reporter_name ?? null,
-            incidentType: typeof row.incident_type === "number" ? row.incident_type : row.incident_type ?? null,
-            severity: typeof row.severity === "number" ? row.severity : row.severity ?? null,
-            incidentTime,
-            latitude: row.latitude, // number (guarded above)
-            longitude: row.longitude, // number (guarded above)
-            synced,
-            syncAttempts: typeof row.sync_attempts === "number" ? row.sync_attempts : row.sync_attempts ?? null,
-            createdAt,
-            updatedAt: row.updated_at ?? null,
-            userId: row.user_id ?? null,
-
-            // UI fields
-            timestamp,
-            status: synced ? "Synced" : "Pending Sync",
-          };
-
-          return incident;
-        })
-        .filter(Boolean) as Incident[];
-
-      setIncidents(mapped);
-      setIsReady(true);
     };
 
+    console.log("About to call fetchIncidents() immediately...");
     fetchIncidents();
     const interval = setInterval(fetchIncidents, 10_000);
 
