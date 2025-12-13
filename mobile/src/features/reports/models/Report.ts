@@ -20,7 +20,7 @@ export default class Report extends Model {
 
     @date('created_at') createdAt!: Date
     @date('updated_at') updatedAt!: Date
-    @text('user_id') userId!: string
+    @text('user_id') userId!: string | null
 
     @field('synced') synced!: boolean
     @field('sync_attempts') syncAttempts!: number
