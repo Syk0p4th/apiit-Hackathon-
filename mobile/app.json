@@ -14,14 +14,20 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "deploymentTarget": "15.1",
+      "supportsTablet": true,
+      "bundleIdentifier": "com.bimsara2k04.apiitHackathon",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.bimsara2k04.apiitHackathon"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -29,6 +35,12 @@
     "plugins": [
       "expo-sqlite",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "94f28eba-434f-420e-9dd0-0ed0de9e16bd"
+      }
+    },
+    "owner": "bimsara2k04"
   }
 }

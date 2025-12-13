@@ -3,8 +3,8 @@ module.exports = function (api) {
     return {
         presets: ['babel-preset-expo'],
         plugins: [
+            ['@babel/plugin-transform-typescript', { allowDeclareFields: true }],
             ['@babel/plugin-proposal-decorators', { legacy: true }],
-            ['@babel/plugin-transform-class-properties', { loose: true }],
         ]
     };
 };

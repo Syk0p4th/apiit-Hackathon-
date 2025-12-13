@@ -4,6 +4,6 @@
     "strict": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
-    "useDefineForClassFields": true
+    "useDefineForClassFields": false
   }
 }
