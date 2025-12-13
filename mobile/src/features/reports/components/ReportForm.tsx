@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { View, TextInput, Button, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
+import { View, Button, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
 import * as Location from 'expo-location'
 import { WebView } from 'react-native-webview'
 import { useNetInfo } from '@react-native-community/netinfo'
@@ -62,11 +62,23 @@ const SEVERITY_LEVELS = [
 ]
 
 export default function ReportForm({ userId }: ReportFormProps) {
-    const [title, setTitle] = useState<string>('')
-    const [description, setDescription] = useState<string>('')
     const [reporterName, setReporterName] = useState<string>('')
     const [incidentType, setIncidentType] = useState<number>(1)
     const [severity, setSeverity] = useState<number>(2)
+
+    const getIncidentLabel = (val: number) => INCIDENT_TYPES.find(t => t.value === val)?.label || 'Incident'
+    const getSeverityLabel = (val: number) => SEVERITY_LEVELS.find(s => s.value === val)?.label || 'Unknown'
+
+    const DEFAULT_MESSAGES: { [key: number]: string } = {
+        1: 'Flood waters rising; avoid flooded roads and low-lying areas.',
+        2: 'Landslide activity reported; steer clear of unstable slopes.',
+        3: 'Powerline hazard; maintain distance and report to authorities.',
+        4: 'Roadblock; expect traffic delays and seek alternate routes.'
+    }
+
+    const buildDescription = (type: number, sev: number) => `${getSeverityLabel(sev)} - ${DEFAULT_MESSAGES[type] || ''}`
+
+    const computeTitle = (type: number) => getIncidentLabel(type)
     const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
     const [address, setAddress] = useState<string>('')
     const [permissionStatus, setPermissionStatus] = useState<string>('')
@@ -78,10 +90,10 @@ export default function ReportForm({ userId }: ReportFormProps) {
         let subscription: Location.LocationSubscription | null = null;
 
         (async () => {
-            // Fetch User Details for Reporter Name
+            // Fetch User Details for Reporter Name (fallback to email)
             const { data: { user } } = await supabase.auth.getUser()
-            if (user?.user_metadata?.full_name) {
-                setReporterName(user.user_metadata.full_name)
+            if (user) {
+                setReporterName(user.user_metadata?.full_name || user.email || '')
             }
 
             // 1. Check if GPS is on
@@ -144,11 +156,21 @@ export default function ReportForm({ userId }: ReportFormProps) {
     }
 
     const handleSave = async () => {
-        if (!title || !description) {
-            setStatus('Title and Description are required')
-            setTimeout(() => setStatus(''), 3000)
-            return
-        }
+        // Compute title and description from incident type and severity
+        const computedTitle = computeTitle(incidentType)
+        const computedDescription = buildDescription(incidentType, severity)
+
+        // Ensure we have a reporter name (fallback to user email)
+        let finalReporter = reporterName
+        try {
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!finalReporter) {
+                finalReporter = user?.user_metadata?.full_name || user?.email || 'Anonymous'
+            }
+        } catch (e) {}
+
+        // Note: Title/Description are computed; no manual input enforcement
+
 
         let finalLocation = location
 
@@ -195,10 +217,10 @@ export default function ReportForm({ userId }: ReportFormProps) {
             await database.write(async () => {
                 const reportsCollection = database.get<Report>('reports')
                 await reportsCollection.create(report => {
-                    report.title = title
+                    report.title = computedTitle
                     // Append address to description if available, since we don't have an address column yet
-                    report.description = address ? `${description}\n\n[Location: ${address}]` : description
-                    report.reporterName = reporterName
+                    report.description = address ? `${computedDescription}\n\n[Location: ${address}]` : computedDescription
+                    report.reporterName = finalReporter
                     report.incidentType = incidentType
                     report.severity = severity
                     report.incidentTime = new Date()
@@ -226,10 +248,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
                 setStatus('Saved Offline 📡')
             }
 
-            // Reset form
-            setTitle('')
-            setDescription('')
-            setReporterName('')
+            // Reset form (keep reporterName)
             setIncidentType(1)
             setSeverity(2)
             setImages([])
@@ -285,25 +304,6 @@ export default function ReportForm({ userId }: ReportFormProps) {
         <ScrollView contentContainerStyle={styles.container}>
             <Text style={styles.header}>New Incident Report</Text>
 
-            <TextInput
-                placeholder="Incident Title"
-                value={title}
-                onChangeText={setTitle}
-                style={styles.input}
-            />
-            <TextInput
-                placeholder="Description"
-                value={description}
-                onChangeText={setDescription}
-                style={[styles.input, { height: 80 }]}
-                multiline
-            />
-            <TextInput
-                placeholder="Reporter Name (Optional)"
-                value={reporterName}
-                onChangeText={setReporterName}
-                style={styles.input}
-            />
 
             <TypeSelector />
             <SeveritySelector />
