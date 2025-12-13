@@ -1,18 +1,28 @@
--- Create the reports table
--- Note: 'id' is text to support WatermelonDB's client-side generated IDs
+-- Drop table if exists (CAUTION: THIS DELETES DATA)
+DROP TABLE IF EXISTS public.reports;
+
+-- Create the reports table with new fields
 CREATE TABLE public.reports (
     id text PRIMARY KEY,
     title text,
     description text,
+    reporter_name text,
+    incident_type integer,
+    severity integer,
+    incident_time timestamptz,
+    latitude double precision,
+    longitude double precision,
+    synced boolean DEFAULT true,
+    sync_attempts integer DEFAULT 0,
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now(),
-    user_id uuid REFERENCES auth.users(id) NOT NULL
+    user_id uuid REFERENCES auth.users(id)
 );
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 
--- Poli-cy: Users can see their own reports
+-- Policy: Users can see their own reports
 CREATE POLICY "Users can view their own reports" 
 ON public.reports FOR SELECT 
 USING (auth.uid() = user_id);

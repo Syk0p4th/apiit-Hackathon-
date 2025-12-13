@@ -42,8 +42,16 @@ export async function sync() {
                             id: row.id,
                             title: row.title,
                             description: row.description,
+                            reporter_name: row.reporter_name,
+                            incident_type: row.incident_type,
+                            severity: row.severity,
+                            incident_time: new Date(safeDate(row.incident_time)).getTime(),
+                            latitude: row.latitude,
+                            longitude: row.longitude,
                             created_at: new Date(safeDate(row.created_at)).getTime(),
                             user_id: row.user_id,
+                            synced: true,
+                            sync_attempts: row.sync_attempts
                         })),
                         deleted: [],
                     },
@@ -58,27 +66,31 @@ export async function sync() {
 
                 const currentUserId = user?.id
 
+                const mapRecord = (record: any) => ({
+                    id: record.id,
+                    title: record.title,
+                    description: record.description,
+                    reporter_name: record.reporterName,
+                    incident_type: record.incidentType,
+                    severity: record.severity,
+                    incident_time: safeDate(record.incidentTime),
+                    latitude: record.latitude,
+                    longitude: record.longitude,
+                    created_at: safeDate(record.createdAt),
+                    updated_at: new Date().toISOString(), // Always update timestamp on push
+                    user_id: currentUserId || record.userId,
+                    sync_attempts: (record.syncAttempts || 0) + 1
+                })
+
                 // Handle created records
                 if (reports.created.length > 0) {
-                    const recordsToInsert = reports.created.map((record: any) => ({
-                        id: record.id,
-                        title: record.title,
-                        description: record.description,
-                        created_at: safeDate(record.createdAt),
-                        user_id: currentUserId || record.userId, // Override with real ID if available to fix RLS
-                    }))
+                    const recordsToInsert = reports.created.map(mapRecord)
                     const { error } = await supabase.from('reports').upsert(recordsToInsert)
                     if (error) throw new Error(error.message)
                 }
 
                 if (reports.updated.length > 0) {
-                    const recordsToUpdate = reports.updated.map((record: any) => ({
-                        id: record.id,
-                        title: record.title,
-                        description: record.description,
-                        created_at: safeDate(record.createdAt),
-                        user_id: currentUserId || record.userId,
-                    }))
+                    const recordsToUpdate = reports.updated.map(mapRecord)
                     const { error } = await supabase.from('reports').upsert(recordsToUpdate)
                     if (error) throw new Error(error.message)
                 }
@@ -86,7 +98,6 @@ export async function sync() {
         })
     } catch (error) {
         console.error('Sync failed:', error)
-        // Don't throw if you want to silently fail, but good to know
     } finally {
         isSyncing = false
     }
