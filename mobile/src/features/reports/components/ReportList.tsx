@@ -43,8 +43,8 @@ const ReportItemComponent = ({ report, onPress }: { report: Report; onPress?: (r
     const incidentConfig = INCIDENT_COLORS[report.incidentType] || INCIDENT_COLORS[1]
     const severityConfig = SEVERITY_CONFIG[report.severity] || SEVERITY_CONFIG[1]
 
-    // Use boolean 'synced' field directly
-    const statusConfig = report.synced ? STATUS_CONFIG.synced : STATUS_CONFIG.unsynced
+    // Use WatermelonDB internal syncStatus for immediate UI updates
+    const statusConfig = report.syncStatus === 'synced' ? STATUS_CONFIG.synced : STATUS_CONFIG.unsynced
 
     // Format date
     const formatDate = (date: Date) => {
@@ -358,9 +358,9 @@ const styles = StyleSheet.create({
 })
 
 // Enhance with WatermelonDB observables
-const enhance = withObservables(['userId'], ({ userId }: { userId: string }) => ({
+const enhance = withObservables(['userId'], ({ userId }: { userId: string | null }) => ({
     reports: database.get<Report>('reports').query(
-        Q.where('user_id', userId),
+        userId ? Q.where('user_id', userId) : Q.where('user_id', null),
         Q.sortBy('created_at', Q.desc)
     )
 }))

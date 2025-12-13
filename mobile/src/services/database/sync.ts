@@ -22,14 +22,16 @@ export async function sync() {
 
         await synchronize({
             database,
-            sendCreatedAsUpdated: true,
+            sendCreatedAsUpdated: false, // Explicitly separate create/update for clearer debugging
             pullChanges: async ({ lastPulledAt }) => {
+                console.log('[Sync] Pulling changes since:', lastPulledAt)
                 const { data, error } = await supabase
                     .from('reports')
                     .select('*')
                     .gt('updated_at', new Date(lastPulledAt || 0).toISOString())
 
                 if (error) {
+                    console.error('[Sync] Pull Error:', error)
                     throw new Error(error.message)
                 }
 
@@ -65,36 +67,52 @@ export async function sync() {
                 const reports = (changes as any).reports
                 if (!reports) return
 
+                const createdCount = reports.created.length
+                const updatedCount = reports.updated.length
+
+                console.log(`[Sync] Pushing: ${createdCount} created, ${updatedCount} updated`)
+
+                if (createdCount === 0 && updatedCount === 0) return
+
                 const currentUserId = user?.id
 
                 const mapRecord = (record: any) => ({
                     id: record.id,
                     title: record.title,
                     description: record.description,
-                    reporter_name: record.reporter_name, // Raw record uses snake_case schema names
+                    reporter_name: record.reporter_name,
                     incident_type: record.incident_type,
                     severity: record.severity,
                     incident_time: safeDate(record.incident_time),
                     latitude: record.latitude,
                     longitude: record.longitude,
-                    images: record.images ? JSON.parse(record.images) : [], // Local (String) -> Supabase (Array)
+                    images: record.images ? JSON.parse(record.images) : [],
                     created_at: safeDate(record.created_at),
                     updated_at: new Date().toISOString(),
-                    user_id: currentUserId || record.user_id,
+                    // Use the session user_id if available (claimed), otherwise keep existing or null
+                    user_id: currentUserId || record.user_id || null,
                     sync_attempts: (record.sync_attempts || 0) + 1
                 })
 
                 // Handle created records
-                if (reports.created.length > 0) {
+                if (createdCount > 0) {
                     const recordsToInsert = reports.created.map(mapRecord)
-                    const { error } = await supabase.from('reports').upsert(recordsToInsert)
-                    if (error) throw new Error(error.message)
+                    console.log('[Sync] Inserting:', recordsToInsert.length)
+                    const { error } = await supabase.from('reports').insert(recordsToInsert) // Use INSERT for created
+                    if (error) {
+                        console.error('[Sync] Insert Error:', error)
+                        throw new Error('Insert Failed: ' + error.message)
+                    }
                 }
 
-                if (reports.updated.length > 0) {
+                if (updatedCount > 0) {
                     const recordsToUpdate = reports.updated.map(mapRecord)
+                    console.log('[Sync] Updating:', recordsToUpdate.length)
                     const { error } = await supabase.from('reports').upsert(recordsToUpdate)
-                    if (error) throw new Error(error.message)
+                    if (error) {
+                        console.error('[Sync] Update Error:', error)
+                        throw new Error('Update Failed: ' + error.message)
+                    }
                 }
             },
         })
