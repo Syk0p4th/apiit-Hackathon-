@@ -1,10 +1,10 @@
 import React, { useState } from 'react'
-import { 
-    View, 
-    TextInput, 
-    TouchableOpacity, 
-    StyleSheet, 
-    Alert, 
+import {
+    View,
+    TextInput,
+    TouchableOpacity,
+    StyleSheet,
+    Alert,
     Text,
     ActivityIndicator,
     KeyboardAvoidingView,
@@ -17,15 +17,22 @@ import { Ionicons } from '@expo/vector-icons'
 export default function AuthScreen() {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
+    const [name, setName] = useState('')
     const [loading, setLoading] = useState(false)
     const [isSignUp, setIsSignUp] = useState(false)
     const [showPassword, setShowPassword] = useState(false)
-    const [errors, setErrors] = useState({ email: '', password: '' })
+    const [errors, setErrors] = useState({ email: '', password: '', name: '' })
 
     // Input validation
     const validateInputs = () => {
         let isValid = true
-        const newErrors = { email: '', password: '' }
+        const newErrors = { email: '', password: '', name: '' }
+
+        // Name validation (only for sign up)
+        if (isSignUp && !name.trim()) {
+            newErrors.name = 'Name is required'
+            isValid = false
+        }
 
         // Email validation
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -72,6 +79,11 @@ export default function AuthScreen() {
         const { error } = await supabase.auth.signUp({
             email: email.trim(),
             password,
+            options: {
+                data: {
+                    full_name: name.trim(),
+                },
+            },
         })
 
         if (error) {
@@ -96,7 +108,7 @@ export default function AuthScreen() {
 
         setLoading(true)
         const { error } = await supabase.auth.resetPasswordForEmail(email.trim())
-        
+
         if (error) {
             Alert.alert('Error', error.message)
         } else {
@@ -106,11 +118,11 @@ export default function AuthScreen() {
     }
 
     return (
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.container}
         >
-            <ScrollView 
+            <ScrollView
                 contentContainerStyle={styles.scrollContent}
                 keyboardShouldPersistTaps="handled"
             >
@@ -123,14 +135,48 @@ export default function AuthScreen() {
                         {isSignUp ? 'Create Account' : 'Welcome Back'}
                     </Text>
                     <Text style={styles.subtitle}>
-                        {isSignUp 
-                            ? 'Sign up to report incidents nearby' 
+                        {isSignUp
+                            ? 'Sign up to report incidents nearby'
                             : 'Log in to report incidents nearby'}
                     </Text>
                 </View>
 
                 {/* Form */}
                 <View style={styles.form}>
+                    {/* Name Input (Sign Up Only) */}
+                    {isSignUp && (
+                        <View style={styles.inputContainer}>
+                            <Text style={styles.label}>Full Name</Text>
+                            <View style={[
+                                styles.inputWrapper,
+                                errors.name && styles.inputError
+                            ]}>
+                                <Ionicons
+                                    name="person-outline"
+                                    size={20}
+                                    color="#994d51"
+                                    style={styles.inputIcon}
+                                />
+                                <TextInput
+                                    style={styles.input}
+                                    onChangeText={(text) => {
+                                        setName(text)
+                                        setErrors({ ...errors, name: '' })
+                                    }}
+                                    value={name}
+                                    placeholder="John Doe"
+                                    placeholderTextColor="#99999966"
+                                    autoCapitalize="words"
+                                    autoComplete="name"
+                                    editable={!loading}
+                                />
+                            </View>
+                            {errors.name ? (
+                                <Text style={styles.errorText}>{errors.name}</Text>
+                            ) : null}
+                        </View>
+                    )}
+
                     {/* Email Input */}
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Email</Text>
@@ -138,10 +184,10 @@ export default function AuthScreen() {
                             styles.inputWrapper,
                             errors.email && styles.inputError
                         ]}>
-                            <Ionicons 
-                                name="mail-outline" 
-                                size={20} 
-                                color="#994d51" 
+                            <Ionicons
+                                name="mail-outline"
+                                size={20}
+                                color="#994d51"
                                 style={styles.inputIcon}
                             />
                             <TextInput
@@ -169,7 +215,7 @@ export default function AuthScreen() {
                         <View style={styles.labelRow}>
                             <Text style={styles.label}>Password</Text>
                             {!isSignUp && (
-                                <TouchableOpacity 
+                                <TouchableOpacity
                                     onPress={handleForgotPassword}
                                     disabled={loading}
                                 >
@@ -183,10 +229,10 @@ export default function AuthScreen() {
                             styles.inputWrapper,
                             errors.password && styles.inputError
                         ]}>
-                            <Ionicons 
-                                name="lock-closed-outline" 
-                                size={20} 
-                                color="#994d51" 
+                            <Ionicons
+                                name="lock-closed-outline"
+                                size={20}
+                                color="#994d51"
                                 style={styles.inputIcon}
                             />
                             <TextInput
@@ -203,13 +249,13 @@ export default function AuthScreen() {
                                 autoComplete="password"
                                 editable={!loading}
                             />
-                            <TouchableOpacity 
+                            <TouchableOpacity
                                 onPress={() => setShowPassword(!showPassword)}
                                 style={styles.eyeIcon}
                             >
-                                <Ionicons 
-                                    name={showPassword ? "eye-off-outline" : "eye-outline"} 
-                                    size={20} 
+                                <Ionicons
+                                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                                    size={20}
                                     color="#994d51"
                                 />
                             </TouchableOpacity>
@@ -243,14 +289,14 @@ export default function AuthScreen() {
 
                     {/* Social Login Buttons */}
                     <View style={styles.socialButtons}>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.socialButton}
                             disabled={loading}
                         >
                             <Ionicons name="logo-google" size={20} color="#1b0e0e" />
                             <Text style={styles.socialButtonText}>Google</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             style={styles.socialButton}
                             disabled={loading}
                         >
@@ -260,7 +306,7 @@ export default function AuthScreen() {
                     </View>
 
                     {/* Guest Mode Button */}
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         style={styles.guestButton}
                         disabled={loading}
                     >
@@ -273,7 +319,7 @@ export default function AuthScreen() {
                 <View style={styles.footer}>
                     <Text style={styles.footerText}>
                         {isSignUp ? "Already have an account? " : "Don't have an account? "}
-                        <Text 
+                        <Text
                             style={styles.footerLink}
                             onPress={() => setIsSignUp(!isSignUp)}
                         >

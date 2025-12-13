@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { View, TextInput, Button, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
 import * as Location from 'expo-location'
 import database from '../../../services/database'
+import { supabase } from '../../../services/api/supabase'
 import 'react-native-get-random-values'
 import Report from '../models/Report'
 
@@ -39,6 +40,12 @@ export default function ReportForm({ userId }: ReportFormProps) {
         let subscription: Location.LocationSubscription | null = null;
 
         (async () => {
+            // Fetch User Details for Reporter Name
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user?.user_metadata?.full_name) {
+                setReporterName(user.user_metadata.full_name)
+            }
+
             // 1. Check if GPS is on
             const servicesEnabled = await Location.hasServicesEnabledAsync()
             if (!servicesEnabled) {
