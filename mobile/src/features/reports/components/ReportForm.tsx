@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { View, Button, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
+import React, { useState, useEffect, useRef } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated } from 'react-native'
 import * as Location from 'expo-location'
 import { WebView } from 'react-native-webview'
 import { useNetInfo } from '@react-native-community/netinfo'
@@ -48,23 +48,24 @@ const getMapHtml = (location: { lat: number; lng: number } | null) => `
 `
 
 const INCIDENT_TYPES = [
-    { label: 'Flooding', value: 1 },
-    { label: 'Landslide', value: 2 },
-    { label: 'Powerline', value: 3 },
-    { label: 'Roadblock', value: 4 },
+    { label: 'Flooding', value: 1, icon: '💧', color: '#3B82F6', description: 'Water levels rising' },
+    { label: 'Landslide', value: 2, icon: '🏔️', color: '#78716C', description: 'Debris & Rockfall' },
+    { label: 'Powerline', value: 3, icon: '⚡', color: '#EAB308', description: 'Live wires exposed' },
+    { label: 'Roadblock', value: 4, icon: '🚧', color: '#F97316', description: 'Impassable route' },
 ]
 
 const SEVERITY_LEVELS = [
-    { label: 'Low', value: 1 },
-    { label: 'Medium', value: 2 },
-    { label: 'High', value: 3 },
-    { label: 'Critical', value: 4 },
+    { label: 'Low', value: 1, color: '#10B981' },
+    { label: 'Moderate', value: 2, color: '#84CC16' },
+    { label: 'Elevated', value: 3, color: '#EAB308' },
+    { label: 'High', value: 4, color: '#F97316' },
+    { label: 'Critical', value: 5, color: '#DC2626' },
 ]
 
 export default function ReportForm({ userId }: ReportFormProps) {
     const [reporterName, setReporterName] = useState<string>('')
-    const [incidentType, setIncidentType] = useState<number>(1)
-    const [severity, setSeverity] = useState<number>(2)
+    const [incidentType, setIncidentType] = useState<number | null>(null)
+    const [severity, setSeverity] = useState<number | null>(null)
 
     const getIncidentLabel = (val: number) => INCIDENT_TYPES.find(t => t.value === val)?.label || 'Incident'
     const getSeverityLabel = (val: number) => SEVERITY_LEVELS.find(s => s.value === val)?.label || 'Unknown'
@@ -85,6 +86,31 @@ export default function ReportForm({ userId }: ReportFormProps) {
     const [images, setImages] = useState<string[]>([])
 
     const [status, setStatus] = useState<string>('')
+
+    // Animation for SOS button pulse
+    const pulseAnim = useRef(new Animated.Value(1)).current
+
+    useEffect(() => {
+        if (incidentType !== null && severity !== null) {
+            // Start pulse animation
+            Animated.loop(
+                Animated.sequence([
+                    Animated.timing(pulseAnim, {
+                        toValue: 1.05,
+                        duration: 1000,
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(pulseAnim, {
+                        toValue: 1,
+                        duration: 1000,
+                        useNativeDriver: true,
+                    }),
+                ])
+            ).start()
+        } else {
+            pulseAnim.setValue(1)
+        }
+    }, [incidentType, severity])
 
     useEffect(() => {
         let subscription: Location.LocationSubscription | null = null;
@@ -117,8 +143,8 @@ export default function ReportForm({ userId }: ReportFormProps) {
                 subscription = await Location.watchPositionAsync(
                     {
                         accuracy: Location.Accuracy.High,
-                        distanceInterval: 5, // Update every 5 meters
-                        timeInterval: 2000   // Minimum time interval of 2 seconds
+                        distanceInterval: 5,
+                        timeInterval: 2000
                     },
                     (newLoc) => {
                         setLocation({
@@ -126,7 +152,6 @@ export default function ReportForm({ userId }: ReportFormProps) {
                             lng: newLoc.coords.longitude,
                         })
                         setPermissionStatus('')
-                        // Optional: Debounce this if needed, but for now we update address on move
                         fetchAddress(newLoc.coords.latitude, newLoc.coords.longitude)
                     }
                 )
@@ -136,7 +161,6 @@ export default function ReportForm({ userId }: ReportFormProps) {
             }
         })()
 
-        // Cleanup subscription on unmount
         return () => {
             if (subscription) {
                 subscription.remove()
@@ -156,11 +180,14 @@ export default function ReportForm({ userId }: ReportFormProps) {
     }
 
     const handleSave = async () => {
-        // Compute title and description from incident type and severity
+        if (incidentType === null || severity === null) {
+            setStatus('Please select incident type and severity')
+            return
+        }
+
         const computedTitle = computeTitle(incidentType)
         const computedDescription = buildDescription(incidentType, severity)
 
-        // Ensure we have a reporter name (fallback to user email)
         let finalReporter = reporterName
         try {
             const { data: { user } } = await supabase.auth.getUser()
@@ -168,9 +195,6 @@ export default function ReportForm({ userId }: ReportFormProps) {
                 finalReporter = user?.user_metadata?.full_name || user?.email || 'Anonymous'
             }
         } catch (e) { }
-
-        // Note: Title/Description are computed; no manual input enforcement
-
 
         let finalLocation = location
 
@@ -218,14 +242,13 @@ export default function ReportForm({ userId }: ReportFormProps) {
                 const reportsCollection = database.get<Report>('reports')
                 await reportsCollection.create(report => {
                     report.title = computedTitle
-                    // Append address to description if available, since we don't have an address column yet
                     report.description = address ? `${computedDescription}\n\n[Location: ${address}]` : computedDescription
                     report.reporterName = finalReporter
                     report.incidentType = incidentType
                     report.severity = severity
                     report.incidentTime = new Date()
                     report.userId = userId
-                    report.latitude = finalLocation!.lat // We checked it's not null/undefined or returned
+                    report.latitude = finalLocation!.lat
                     report.longitude = finalLocation!.lng
                     report.images = images
                     report.createdAt = new Date()
@@ -233,47 +256,52 @@ export default function ReportForm({ userId }: ReportFormProps) {
                 })
             })
 
-            setStatus('Saved Locally')
+            setStatus('🚨 Emergency Report Sent!')
 
             if (isOnline) {
-                setStatus('Syncing...')
+                setStatus('📡 Syncing with Emergency Services...')
                 try {
                     await sync()
-                    setStatus('Saved & Synced! ☁️')
+                    setStatus('✅ Report Delivered Successfully!')
                 } catch (err) {
                     console.warn('Immediate sync failed:', err)
-                    setStatus('Saved (Sync Pending) ⏳')
+                    setStatus('📤 Report Saved (Sync Pending)')
                 }
             } else {
-                setStatus('Saved Offline 📡')
+                setStatus('💾 Saved Offline - Will Sync When Online')
             }
 
-            // Reset form (keep reporterName)
-            setIncidentType(1)
-            setSeverity(2)
+            // Reset form
+            setIncidentType(null)
+            setSeverity(null)
             setImages([])
-            // setLocation(null) 
-            // setAddress('') 
 
-            setTimeout(() => setStatus(''), 3000)
+            setTimeout(() => setStatus(''), 4000)
         } catch (e) {
             console.error(e)
-            setStatus('Error saving')
+            setStatus('❌ Error saving report')
         }
     }
 
-    // Simple Select Components
     const TypeSelector = () => (
         <View style={styles.selectorContainer}>
-            <Text style={styles.label}>Incident Type:</Text>
-            <View style={styles.buttonGroup}>
+            <Text style={styles.sectionTitle}>SPECIFY DISASTER TYPE</Text>
+            <View style={styles.cardGrid}>
                 {INCIDENT_TYPES.map(t => (
                     <TouchableOpacity
                         key={t.value}
-                        style={[styles.selectBtn, incidentType === t.value && styles.selectBtnActive]}
+                        style={[
+                            styles.typeCard,
+                            incidentType === t.value && { ...styles.typeCardActive, borderColor: t.color }
+                        ]}
                         onPress={() => setIncidentType(t.value)}
+                        activeOpacity={0.7}
                     >
-                        <Text style={[styles.selectBtnText, incidentType === t.value && styles.selectBtnTextActive]}>{t.label}</Text>
+                        <View style={[styles.iconCircle, { backgroundColor: t.color + '20' }]}>
+                            <Text style={styles.iconText}>{t.icon}</Text>
+                        </View>
+                        <Text style={styles.typeLabel}>{t.label}</Text>
+                        <Text style={styles.typeDescription}>{t.description}</Text>
                     </TouchableOpacity>
                 ))}
             </View>
@@ -282,17 +310,34 @@ export default function ReportForm({ userId }: ReportFormProps) {
 
     const SeveritySelector = () => (
         <View style={styles.selectorContainer}>
-            <Text style={styles.label}>Severity:</Text>
-            <View style={styles.buttonGroup}>
+            <View style={styles.severityHeader}>
+                <Text style={styles.sectionTitle}>SEVERITY LEVEL</Text>
+                <View style={styles.requiredBadge}>
+                    <Text style={styles.requiredText}>REQUIRED</Text>
+                </View>
+            </View>
+            <View style={styles.severityGrid}>
                 {SEVERITY_LEVELS.map(s => (
                     <TouchableOpacity
                         key={s.value}
-                        style={[styles.selectBtn, severity === s.value && styles.selectBtnActive]}
+                        style={[
+                            styles.severityButton,
+                            severity === s.value && { ...styles.severityButtonActive, borderColor: s.color }
+                        ]}
                         onPress={() => setSeverity(s.value)}
+                        activeOpacity={0.7}
                     >
-                        <Text style={[styles.selectBtnText, severity === s.value && styles.selectBtnTextActive]}>{s.label}</Text>
+                        <View style={[styles.severityIndicator, { backgroundColor: s.color }]} />
+                        <Text style={[
+                            styles.severityNumber,
+                            severity === s.value && { color: s.color }
+                        ]}>{s.value}</Text>
                     </TouchableOpacity>
                 ))}
+            </View>
+            <View style={styles.severityLabels}>
+                <Text style={styles.severityLabelText}>Low Risk</Text>
+                <Text style={[styles.severityLabelText, styles.severityLabelCritical]}>Critical Risk</Text>
             </View>
         </View>
     )
@@ -300,18 +345,52 @@ export default function ReportForm({ userId }: ReportFormProps) {
     const { isConnected } = useNetInfo()
     const isOnline = isConnected === true
 
+    const isFormValid = incidentType !== null && severity !== null
+
     return (
         <ScrollView contentContainerStyle={styles.container}>
-            <Text style={styles.header}>New Incident Report</Text>
+            <View style={styles.header}>
+                <Text style={styles.mainTitle}>Is there an emergency?</Text>
+                <Text style={styles.subtitle}>Select severity level to activate SOS</Text>
+            </View>
 
+            {/* SOS Button */}
+            <View style={styles.sosContainer}>
+                <Animated.View style={[
+                    styles.sosButtonWrapper,
+                    { transform: [{ scale: pulseAnim }] }
+                ]}>
+                    <TouchableOpacity
+                        style={[
+                            styles.sosButton,
+                            isFormValid && styles.sosButtonActive
+                        ]}
+                        onPress={handleSave}
+                        disabled={!isFormValid}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={[
+                            styles.sosIcon,
+                            isFormValid && styles.sosIconActive
+                        ]}>🚨</Text>
+                        <Text style={[
+                            styles.sosText,
+                            isFormValid && styles.sosTextActive
+                        ]}>SOS</Text>
+                    </TouchableOpacity>
+                </Animated.View>
+                <Text style={styles.sosWarning}>
+                    Emergency Services will be notified immediately
+                </Text>
+            </View>
 
             <TypeSelector />
             <SeveritySelector />
 
-
-
             <View style={styles.locationContainer}>
-                <Text style={styles.label}>Location ({isOnline ? 'Online - Tap Map to Move' : 'Offline - GPS Only'}):</Text>
+                <Text style={styles.sectionTitle}>
+                    LOCATION {isOnline ? '(Online - Tap Map to Move)' : '(Offline - GPS Only)'}
+                </Text>
 
                 {isOnline && (
                     <View style={styles.mapContainer}>
@@ -334,16 +413,16 @@ export default function ReportForm({ userId }: ReportFormProps) {
                     </View>
                 )}
 
-                <Text style={styles.label}>GPS Coordinates:</Text>
+                <Text style={styles.coordsLabel}>GPS Coordinates:</Text>
                 {location ? (
                     <>
                         <Text style={styles.coords}>
-                            Lat: {location.lat.toFixed(5)}, Lng: {location.lng.toFixed(5)}
+                            📍 {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
                         </Text>
-                        {!!address && <Text style={styles.address}>📍 {address}</Text>}
+                        {!!address && <Text style={styles.address}>{address}</Text>}
                     </>
                 ) : (
-                    <Text style={[styles.coords, { color: 'orange' }]}>
+                    <Text style={[styles.coords, { color: '#F97316' }]}>
                         {permissionStatus ? permissionStatus : 'Acquiring Satellite/GPS...'}
                     </Text>
                 )}
@@ -351,54 +430,285 @@ export default function ReportForm({ userId }: ReportFormProps) {
 
             <ImagePickerSection images={images} onImagesChange={setImages} />
 
-            <View style={{ marginTop: 20 }}>
-                <Button title="Save Report" onPress={handleSave} />
-            </View>
-            {!!status && <Text style={styles.status}>{status}</Text>}
+            {!!status && (
+                <View style={styles.statusContainer}>
+                    <Text style={styles.statusText}>{status}</Text>
+                </View>
+            )}
+
+            <View style={styles.bottomSpacer} />
         </ScrollView>
     )
 }
 
 const styles = StyleSheet.create({
-    container: { padding: 20 },
-    header: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-    input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 5, padding: 10, marginBottom: 15, backgroundColor: '#fff' },
-    status: { marginTop: 15, fontSize: 16, color: 'blue', textAlign: 'center' },
+    container: {
+        padding: 20,
+        paddingBottom: 40,
+    },
+    header: {
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    mainTitle: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: 8,
+        color: '#1a1a1a',
+    },
+    subtitle: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+    },
 
-    selectorContainer: { marginBottom: 15 },
-    label: { marginBottom: 5, fontWeight: '600' },
-    buttonGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-    selectBtn: { padding: 8, borderWidth: 1, borderColor: '#ddd', borderRadius: 20, backgroundColor: '#f0f0f0' },
-    selectBtnActive: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
-    selectBtnText: { fontSize: 12, color: '#333' },
-    selectBtnTextActive: { color: '#fff' },
+    // SOS Button Styles
+    sosContainer: {
+        alignItems: 'center',
+        marginVertical: 24,
+    },
+    sosButtonWrapper: {
+        marginBottom: 12,
+    },
+    sosButton: {
+        width: 180,
+        height: 180,
+        borderRadius: 90,
+        backgroundColor: '#E5E5E5',
+        borderWidth: 6,
+        borderColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+    },
+    sosButtonActive: {
+        backgroundColor: '#EA2A33',
+        borderColor: '#EA2A33',
+        shadowColor: '#EA2A33',
+        shadowOpacity: 0.5,
+        shadowRadius: 20,
+        elevation: 12,
+    },
+    sosIcon: {
+        fontSize: 64,
+        marginBottom: 8,
+        opacity: 0.4,
+    },
+    sosIconActive: {
+        opacity: 1,
+    },
+    sosText: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        letterSpacing: 4,
+        color: '#999',
+    },
+    sosTextActive: {
+        color: '#fff',
+    },
+    sosWarning: {
+        fontSize: 11,
+        color: '#666',
+        backgroundColor: '#F5F5F5',
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        borderRadius: 20,
+        overflow: 'hidden',
+        fontWeight: '500',
+    },
 
+    // Section Styles
+    selectorContainer: {
+        marginBottom: 32,
+    },
+    sectionTitle: {
+        fontSize: 11,
+        fontWeight: 'bold',
+        letterSpacing: 1,
+        color: '#666',
+        marginBottom: 16,
+    },
+
+    // Type Card Styles
+    cardGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    typeCard: {
+        width: '48%',
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        borderWidth: 2,
+        borderColor: 'transparent',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    typeCardActive: {
+        borderWidth: 2,
+        backgroundColor: '#F8F9FA',
+        shadowOpacity: 0.15,
+        elevation: 4,
+    },
+    iconCircle: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
+    },
+    iconText: {
+        fontSize: 24,
+    },
+    typeLabel: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        color: '#1a1a1a',
+        marginBottom: 4,
+    },
+    typeDescription: {
+        fontSize: 11,
+        color: '#666',
+    },
+
+    // Severity Styles
+    severityHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    requiredBadge: {
+        backgroundColor: '#FEE2E2',
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        borderRadius: 12,
+    },
+    requiredText: {
+        fontSize: 9,
+        fontWeight: 'bold',
+        color: '#EA2A33',
+        letterSpacing: 0.5,
+    },
+    severityGrid: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    severityButton: {
+        flex: 1,
+        aspectRatio: 1,
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        borderWidth: 2,
+        borderColor: 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    severityButtonActive: {
+        borderWidth: 2,
+        backgroundColor: '#F8F9FA',
+        shadowOpacity: 0.15,
+        elevation: 3,
+    },
+    severityIndicator: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: 4,
+        borderBottomLeftRadius: 10,
+        borderBottomRightRadius: 10,
+    },
+    severityNumber: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#666',
+    },
+    severityLabels: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 8,
+        paddingHorizontal: 4,
+    },
+    severityLabelText: {
+        fontSize: 10,
+        color: '#999',
+    },
+    severityLabelCritical: {
+        fontWeight: 'bold',
+        color: '#EA2A33',
+    },
+
+    // Location Styles
     locationContainer: {
         marginTop: 10,
-        padding: 10,
-        backgroundColor: '#f9f9f9',
-        borderRadius: 5,
+        padding: 16,
+        backgroundColor: '#F8F9FA',
+        borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#eee'
+        borderColor: '#E5E5E5',
     },
     mapContainer: {
         height: 200,
-        borderRadius: 10,
+        borderRadius: 12,
         overflow: 'hidden',
+        marginBottom: 16,
         borderWidth: 1,
-        borderColor: '#ddd',
-        marginBottom: 10
+        borderColor: '#E5E5E5',
+    },
+    coordsLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#666',
+        marginBottom: 8,
     },
     coords: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: 'bold',
-        color: '#333',
-        marginTop: 2
+        color: '#1a1a1a',
+        marginBottom: 4,
     },
     address: {
-        fontSize: 14,
-        color: '#007AFF',
+        fontSize: 13,
+        color: '#3B82F6',
+        fontStyle: 'italic',
         marginTop: 4,
-        fontStyle: 'italic'
+    },
+
+    // Status Styles
+    statusContainer: {
+        marginTop: 24,
+        padding: 16,
+        backgroundColor: '#EFF6FF',
+        borderRadius: 12,
+        borderLeftWidth: 4,
+        borderLeftColor: '#3B82F6',
+    },
+    statusText: {
+        fontSize: 15,
+        color: '#1E40AF',
+        textAlign: 'center',
+        fontWeight: '600',
+    },
+
+    bottomSpacer: {
+        height: 40,
     },
 })
