@@ -1,5 +1,9 @@
 import { Model } from '@nozbe/watermelondb'
-import { field, date, readonly, text } from '@nozbe/watermelondb/decorators'
+import { field, date, readonly, text, json } from '@nozbe/watermelondb/decorators'
+
+const sanitizeImages = (raw: any) => {
+    return Array.isArray(raw) ? raw : []
+}
 
 export default class Report extends Model {
     static table = 'reports'
@@ -12,6 +16,7 @@ export default class Report extends Model {
     @date('incident_time') incidentTime!: Date
     @field('latitude') latitude!: number | null
     @field('longitude') longitude!: number | null
+    @json('images', sanitizeImages) images!: string[]
 
     @date('created_at') createdAt!: Date
     @date('updated_at') updatedAt!: Date

@@ -8,6 +8,7 @@ import Report from '../models/Report'
 // Components
 import { IncidentTypeSelector, SeveritySelector } from './form/Selectors'
 import LocationPicker from './form/LocationPicker'
+import ImagePickerSection from './form/ImagePickerSection'
 
 interface ReportFormProps {
     userId: string
@@ -23,6 +24,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
 
     const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
     const [address, setAddress] = useState<string>('')
+    const [images, setImages] = useState<string[]>([])
     const [status, setStatus] = useState<string>('')
 
     const handleLocationUpdate = (loc: { lat: number; lng: number }, addr?: string) => {
@@ -55,6 +57,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
                     report.userId = userId
                     report.latitude = finalLocation?.lat || 0
                     report.longitude = finalLocation?.lng || 0
+                    report.images = images
                     report.createdAt = new Date()
                     report.synced = false
                 })
@@ -62,7 +65,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
             setStatus('Saved Offline')
             // Reset
             setTitle(''); setDescription(''); setReporterName('')
-            setIncidentType(1); setSeverity(2);
+            setIncidentType(1); setSeverity(2); setImages([])
             // We keep location to continue tracking user path
 
             setTimeout(() => setStatus(''), 3000)
@@ -85,6 +88,8 @@ export default function ReportForm({ userId }: ReportFormProps) {
                 address={address}
                 onLocationUpdate={handleLocationUpdate}
             />
+
+            <ImagePickerSection images={images} onImagesChange={setImages} />
 
             <Button title="Save Report" onPress={handleSave} />
             {!!status && <Text style={styles.status}>{status}</Text>}

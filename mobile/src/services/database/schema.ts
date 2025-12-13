@@ -1,7 +1,7 @@
 import { appSchema, tableSchema } from '@nozbe/watermelondb'
 
 export default appSchema({
-    version: 2,
+    version: 3,
     tables: [
         tableSchema({
             name: 'reports',
@@ -14,6 +14,7 @@ export default appSchema({
                 { name: 'incident_time', type: 'number' }, // UNIX timestamp
                 { name: 'latitude', type: 'number', isOptional: true },
                 { name: 'longitude', type: 'number', isOptional: true },
+                { name: 'images', type: 'string', isOptional: true },
                 { name: 'created_at', type: 'number' },
                 { name: 'updated_at', type: 'number' },
                 { name: 'user_id', type: 'string' },
