@@ -10,17 +10,23 @@ function formatDateTime(value?: string | null) {
   return d.toLocaleString();
 }
 
-export default function IncidentTable({ incidents }: { incidents: Incident[] }) {
+export default function IncidentTable({ 
+  incidents,
+  onSelectIncident 
+}: { 
+  incidents: Incident[];
+  onSelectIncident?: (incident: Incident) => void;
+}) {
   return (
-    <div className="p-3">
+    <div className="p-3 flex flex-col h-full">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-slate-200">Latest reports</h3>
         <span className="text-xs text-slate-400">{incidents.length} shown</span>
       </div>
 
-      <div className="overflow-auto">
+      <div className="overflow-auto flex-1">
         <table className="w-full text-sm">
-          <thead className="text-slate-400">
+          <thead className="text-slate-400 sticky top-0 bg-slate-900">
             <tr className="border-b border-slate-800">
               <th className="text-left py-2 pr-3">Title</th>
               <th className="text-left py-2 pr-3">Reporter</th>
@@ -34,7 +40,11 @@ export default function IncidentTable({ incidents }: { incidents: Incident[] }) 
 
           <tbody className="text-slate-200">
             {incidents.map((i) => (
-              <tr key={i.id} className="border-b border-slate-800/70">
+              <tr 
+                key={i.id} 
+                className="border-b border-slate-800/70 hover:bg-slate-800/30 cursor-pointer transition"
+                onClick={() => onSelectIncident?.(i)}
+              >
                 <td className="py-2 pr-3">
                   <div className="font-medium">{i.title ?? "-"}</div>
                   {i.description ? (
