@@ -57,8 +57,8 @@ export const SeveritySelector: React.FC<SelectorProps> = ({ value, onChange }) =
 const styles = StyleSheet.create({
     selectorContainer: { marginBottom: 15 },
     label: { marginBottom: 5, fontWeight: '600' },
-    buttonGroup: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
-    selectBtn: { padding: 8, borderWidth: 1, borderColor: '#ddd', borderRadius: 20, backgroundColor: '#f0f0f0' },
+    buttonGroup: { flexDirection: 'row', flexWrap: 'wrap' },
+    selectBtn: { padding: 8, borderWidth: 1, borderColor: '#ddd', borderRadius: 20, backgroundColor: '#f0f0f0', marginRight: 5, marginBottom: 5 },
     selectBtnActive: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
     selectBtnText: { fontSize: 12, color: '#333' },
     selectBtnTextActive: { color: '#fff' },
