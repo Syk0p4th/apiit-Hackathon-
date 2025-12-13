@@ -258,6 +258,14 @@ const styles = StyleSheet.create({
         borderRadius: 10,
         overflow: 'hidden',
     },
+    locationContainer: {
+        marginBottom: 10,
+    },
+    coords: {
+        fontSize: 14,
+        color: '#666',
+        marginTop: 2
+    },
     status: { marginTop: 15, fontSize: 16, color: 'blue', textAlign: 'center' },
 
     selectorContainer: { marginBottom: 15 },
