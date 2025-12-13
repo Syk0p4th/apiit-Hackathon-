@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { View, TextInput, Button, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
 import * as Location from 'expo-location'
+import { WebView } from 'react-native-webview'
+import { useNetInfo } from '@react-native-community/netinfo'
 import database from '../../../services/database'
 import { supabase } from '../../../services/api/supabase'
 import 'react-native-get-random-values'
@@ -11,6 +13,38 @@ import ImagePickerSection from './form/ImagePickerSection'
 interface ReportFormProps {
     userId: string
 }
+
+const getMapHtml = (location: { lat: number; lng: number } | null) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <style> body { margin: 0; padding: 0; } #map { width: 100%; height: 100vh; } </style>
+</head>
+<body>
+    <div id="map"></div>
+    <script>
+        var map = L.map('map').setView([${location ? location.lat : 6.9271}, ${location ? location.lng : 79.8612}], 15);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap'
+        }).addTo(map);
+        ${location ? `L.marker([${location.lat}, ${location.lng}]).addTo(map);` : ''}
+        
+        map.on('click', function(e) {
+             window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'click',
+                payload: { lat: e.latlng.lat, lng: e.latlng.lng }
+            }));
+            map.eachLayer(function (layer) { if (layer instanceof L.Marker) map.removeLayer(layer); });
+            L.marker(e.latlng).addTo(map);
+        });
+    </script>
+</body>
+</html>
+`
 
 const INCIDENT_TYPES = [
     { label: 'Flooding', value: 1 },
@@ -230,6 +264,9 @@ export default function ReportForm({ userId }: ReportFormProps) {
         </View>
     )
 
+    const { isConnected } = useNetInfo()
+    const isOnline = isConnected === true
+
     return (
         <ScrollView contentContainerStyle={styles.container}>
             <Text style={styles.header}>New Incident Report</Text>
@@ -257,8 +294,34 @@ export default function ReportForm({ userId }: ReportFormProps) {
             <TypeSelector />
             <SeveritySelector />
 
+            <TypeSelector />
+            <SeveritySelector />
+
             <View style={styles.locationContainer}>
-                <Text style={styles.label}>GPS Location:</Text>
+                <Text style={styles.label}>Location ({isOnline ? 'Online - Tap Map to Move' : 'Offline - GPS Only'}):</Text>
+
+                {isOnline && (
+                    <View style={styles.mapContainer}>
+                        <WebView
+                            originWhitelist={['*']}
+                            source={{ html: getMapHtml(location) }}
+                            onMessage={(event) => {
+                                if (event.nativeEvent.data) {
+                                    try {
+                                        const data = JSON.parse(event.nativeEvent.data);
+                                        if (data.type === 'click') {
+                                            const newLoc = { lat: data.payload.lat, lng: data.payload.lng }
+                                            setLocation(newLoc)
+                                            fetchAddress(newLoc.lat, newLoc.lng)
+                                        }
+                                    } catch (e) { }
+                                }
+                            }}
+                        />
+                    </View>
+                )}
+
+                <Text style={styles.label}>GPS Coordinates:</Text>
                 {location ? (
                     <>
                         <Text style={styles.coords}>
@@ -304,6 +367,14 @@ const styles = StyleSheet.create({
         borderRadius: 5,
         borderWidth: 1,
         borderColor: '#eee'
+    },
+    mapContainer: {
+        height: 200,
+        borderRadius: 10,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        marginBottom: 10
     },
     coords: {
         fontSize: 16,
