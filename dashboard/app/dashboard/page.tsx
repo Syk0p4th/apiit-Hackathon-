@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { Incident } from "@/types/incident";
 import { supabase } from "@/lib/supabaseClient";
+import { getIncidentTypeName } from "@/lib/incidentTypes";
 import IncidentMap from "../components/IncidentMap";
 import IncidentTable from "../components/IncidentTable";
 import IncidentDetail from "../components/IncidentDetail";
@@ -18,7 +19,7 @@ export default function DashboardPage() {
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null);
   const [filterType, setFilterType] = useState<string>("all");
   const [filterSeverity, setFilterSeverity] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<"time" | "severity">("time");
+  const [sortBy, setSortBy] = useState<"time" | "severity" | "type">("time");
 
   console.log("[DashboardPage] Rendering - incidents:", incidents.length, "isReady:", isReady);
 
@@ -203,8 +204,8 @@ export default function DashboardPage() {
   // Apply filters and sorting
   const filteredIncidents = incidents
     .filter((inc) => {
-      // Filter by type
-      if (filterType !== "all" && String(inc.incidentType) !== filterType) return false;
+      // Filter by type - compare using getIncidentTypeName to convert number to name
+      if (filterType !== "all" && getIncidentTypeName(inc.incidentType) !== filterType) return false;
       // Filter by severity range
       const sev = inc.severity ?? 0;
       if (filterSeverity === "low" && sev > 2) return false;
@@ -214,6 +215,11 @@ export default function DashboardPage() {
     .sort((a, b) => {
       if (sortBy === "severity") {
         return (b.severity ?? 0) - (a.severity ?? 0);
+      }
+      if (sortBy === "type") {
+        const typeA = String(a.incidentType ?? "");
+        const typeB = String(b.incidentType ?? "");
+        return typeA.localeCompare(typeB);
       }
       // Sort by time (newest first)
       return new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
@@ -311,11 +317,12 @@ export default function DashboardPage() {
               </select>
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as "time" | "severity")}
+                onChange={(e) => setSortBy(e.target.value as "time" | "severity" | "type")}
                 className="text-xs px-2 py-1 bg-slate-800 border border-slate-700 rounded text-slate-300"
               >
                 <option value="time">Sort by Time</option>
                 <option value="severity">Sort by Severity</option>
+                <option value="type">Sort by Type</option>
               </select>
             </div>
             <p className="text-xs text-slate-400">Showing {filteredIncidents.length} of {incidents.length} incidents</p>
