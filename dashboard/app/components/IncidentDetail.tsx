@@ -159,21 +159,21 @@ export default function IncidentDetail({
           )}
 
           {/* Photo/Image */}
-          {incident.photoUrl && (
+          {incident.images && incident.images.length > 0 && (
             <div>
               <p className="text-xs text-slate-500 mb-2">Photo</p>
               <img
                 src={
-                  incident.photoUrl.startsWith("http") || incident.photoUrl.startsWith("data:")
-                    ? incident.photoUrl
-                    : `data:image/jpeg;base64,${incident.photoUrl}`
+                  incident.images[0].startsWith("http") || incident.images[0].startsWith("data:")
+                    ? incident.images[0]
+                    : `data:image/jpeg;base64,${incident.images[0]}`
                 }
                 alt={incident.title || "Incident photo"}
                 className="w-full h-auto rounded border border-slate-700 max-h-96 object-cover"
                 onError={(e) => {
                   console.error("Failed to load image with current format, trying PNG...");
                   const img = e.currentTarget as HTMLImageElement;
-                  const photoUrl = incident.photoUrl!;
+                  const photoUrl = incident.images![0]!;
                   // If it failed and it's a base64 image, try with PNG format instead
                   if (!photoUrl.startsWith("http") && !photoUrl.startsWith("data:")) {
                     img.src = `data:image/png;base64,${photoUrl}`;

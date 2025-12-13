@@ -84,38 +84,10 @@ export default function DashboardPage() {
               "created_at",
               "updated_at",
               "user_id",
-              "photo_url",
+              "images",
             ].join(",")
           )
           .order("incident_time", { ascending: false });
-
-        // If error (possibly due to photo_url column not existing), retry without it
-        if (error) {
-          console.warn("Query with photo_url failed, retrying without photo_url...", error);
-          const retryQuery = await supabase
-            .from("reports")
-            .select(
-              [
-                "id",
-                "title",
-                "description",
-                "reporter_name",
-                "incident_type",
-                "severity",
-                "incident_time",
-                "latitude",
-                "longitude",
-                "synced",
-                "sync_attempts",
-                "created_at",
-                "updated_at",
-                "user_id",
-              ].join(",")
-            )
-            .order("incident_time", { ascending: false });
-          data = retryQuery.data;
-          error = retryQuery.error;
-        }
 
         if (cancelled) return;
 
@@ -166,7 +138,7 @@ export default function DashboardPage() {
               createdAt,
               updatedAt: row.updated_at ?? null,
               userId: row.user_id ?? null,
-              photoUrl: row.photo_url ?? null,
+              images: row.images ?? [],
 
               // UI fields
               timestamp,

@@ -22,5 +22,5 @@ export type Incident = {
   status: SyncStatus;
 
   // kept for compatibility (not in reports schema)
-  photoUrl?: string;
+  images?: string[];
 };
