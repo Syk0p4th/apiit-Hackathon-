@@ -291,23 +291,6 @@ export default function AuthScreen({ onGuestLogin }: AuthScreenProps) {
                         <View style={styles.dividerLine} />
                     </View>
 
-                    {/* Social Login Buttons */}
-                    <View style={styles.socialButtons}>
-                        <TouchableOpacity
-                            style={styles.socialButton}
-                            disabled={loading}
-                        >
-                            <Ionicons name="logo-google" size={20} color="#1b0e0e" />
-                            <Text style={styles.socialButtonText}>Google</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={styles.socialButton}
-                            disabled={loading}
-                        >
-                            <Ionicons name="logo-apple" size={20} color="#1b0e0e" />
-                            <Text style={styles.socialButtonText}>Apple</Text>
-                        </TouchableOpacity>
-                    </View>
 
                     {/* Guest Mode Button */}
                     {onGuestLogin && (
