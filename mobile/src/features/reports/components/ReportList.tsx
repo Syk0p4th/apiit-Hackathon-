@@ -1,38 +1,106 @@
-import React from 'react'
-import { View, Text, FlatList, StyleSheet } from 'react-native'
+import React, { useState, useMemo } from 'react'
+import { View, Text, SectionList, StyleSheet, TouchableOpacity, ScrollView } from 'react-native'
 import { withObservables } from '@nozbe/watermelondb/react'
 import database from '../../../services/database'
 import Report from '../models/Report'
+import { Q } from '@nozbe/watermelondb'
 
 interface ReportListProps {
     reports: Report[]
     userId: string | null
+    onReportPress?: (report: Report) => void
 }
 
-const ReportItemComponent = ({ report }: { report: Report }) => {
-    const isSynced = report.syncStatus === 'synced'
+// Icon mapping for incident types
+const INCIDENT_ICONS: { [key: number]: string } = {
+    1: '💧', // Flooding
+    2: '🏔️', // Landslide
+    3: '⚡', // Powerline
+    4: '🚧', // Roadblock
+}
+
+const INCIDENT_COLORS: { [key: number]: { bg: string; text: string } } = {
+    1: { bg: '#EFF6FF', text: '#3B82F6' }, // Blue
+    2: { bg: '#F5F5F4', text: '#78716C' }, // Stone
+    3: { bg: '#FFFBEB', text: '#EAB308' }, // Yellow
+    4: { bg: '#FFF7ED', text: '#F97316' }, // Orange
+}
+
+const SEVERITY_CONFIG: { [key: number]: { label: string; color: string; bg: string } } = {
+    1: { label: 'Low', color: '#6B7280', bg: '#F9FAFB' },
+    2: { label: 'Medium', color: '#EAB308', bg: '#FFFBEB' },
+    3: { label: 'Elevated', color: '#EAB308', bg: '#FFFBEB' },
+    4: { label: 'High', color: '#F97316', bg: '#FFF7ED' },
+    5: { label: 'Critical', color: '#EA2A33', bg: '#FEF2F2' },
+}
+
+const STATUS_CONFIG = {
+    unsynced: { label: 'Unsynced', color: '#F97316', bg: '#FFF7ED' },
+    synced: { label: 'Synced', color: '#10B981', bg: '#ECFDF5' },
+}
+
+const ReportItemComponent = ({ report, onPress }: { report: Report; onPress?: (report: Report) => void }) => {
+    const incidentConfig = INCIDENT_COLORS[report.incidentType] || INCIDENT_COLORS[1]
+    const severityConfig = SEVERITY_CONFIG[report.severity] || SEVERITY_CONFIG[1]
+
+    // Use boolean 'synced' field directly
+    const statusConfig = report.synced ? STATUS_CONFIG.synced : STATUS_CONFIG.unsynced
+
+    // Format date
+    const formatDate = (date: Date) => {
+        return new Intl.DateTimeFormat('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        }).format(date)
+    }
 
     return (
-        <View style={styles.card}>
-            <View style={styles.headerRow}>
-                <Text style={styles.title}>{report.title}</Text>
-                <View style={[styles.badge, isSynced ? styles.badgeSynced : styles.badgePending]}>
-                    <Text style={styles.badgeText}>
-                        {isSynced ? 'Synced ✅' : 'Pending ⏳'}
-                    </Text>
+        <TouchableOpacity
+            style={styles.card}
+            onPress={() => onPress?.(report)}
+            activeOpacity={0.7}
+        >
+            <View style={styles.cardContent}>
+                <View style={styles.cardMain}>
+                    {/* Icon */}
+                    <View style={[styles.iconContainer, { backgroundColor: incidentConfig.bg }]}>
+                        <Text style={[styles.iconText, { color: incidentConfig.text }]}>
+                            {INCIDENT_ICONS[report.incidentType] || '📍'}
+                        </Text>
+                    </View>
+
+                    {/* Content */}
+                    <View style={styles.contentContainer}>
+                        <Text style={styles.cardTitle}>{report.title}</Text>
+                        <Text style={styles.cardDate}>{formatDate(report.createdAt)}</Text>
+
+                        {/* Badges */}
+                        <View style={styles.badgeRow}>
+                            {/* Status Badge */}
+                            <View style={[styles.badge, { backgroundColor: statusConfig.bg }]}>
+                                <Text style={[styles.badgeText, { color: statusConfig.color }]}>
+                                    {statusConfig.label}
+                                </Text>
+                            </View>
+
+                            {/* Severity Badge */}
+                            <View style={[styles.badge, styles.severityBadge, { backgroundColor: severityConfig.bg }]}>
+                                {report.severity >= 4 && (
+                                    <Text style={styles.severityIcon}>⚠️</Text>
+                                )}
+                                <Text style={[styles.badgeText, styles.badgeTextBold, { color: severityConfig.color }]}>
+                                    {severityConfig.label}
+                                </Text>
+                            </View>
+                        </View>
+                    </View>
                 </View>
-            </View>
 
-            <Text style={styles.description}>{report.description}</Text>
-
-            <View style={styles.metaRow}>
-                <Text style={styles.meta}>Severity: {report.severityLabel}</Text>
-                <Text style={styles.meta}>Type: {report.incidentTypeLabel}</Text>
             </View>
-            <Text style={styles.coords}>
-                {report.latitude?.toFixed(4)}, {report.longitude?.toFixed(4)}
-            </Text>
-        </View>
+        </TouchableOpacity >
     )
 }
 
@@ -40,142 +108,260 @@ const ReportItem = withObservables(['report'], ({ report }) => ({
     report
 }))(ReportItemComponent)
 
-const getSeverityColor = (severity: number) => {
-    switch (severity) {
-        case 3: return 'orange'
-        case 4: return 'red'
-        default: return 'green'
-    }
-}
+const ReportList: React.FC<ReportListProps> = ({ reports, onReportPress }) => {
 
-const ReportList: React.FC<ReportListProps> = ({ reports }) => {
-    // Split reports into two groups using internal status
-    const pendingReports = reports.filter(r => r.syncStatus !== 'synced')
-    const syncedReports = reports.filter(r => r.syncStatus === 'synced')
+    // Filter and group reports
+    const { sections } = useMemo(() => {
+        // Sort by date (newest first)
+        const sorted = [...reports].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 
-    // Sort: Pending (Oldest first), Synced (Newest first)
-    pendingReports.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-    syncedReports.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        // Group by recency
+        const now = new Date()
+        const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000)
+
+        const recent = sorted.filter(r => r.createdAt >= twoDaysAgo)
+        const older = sorted.filter(r => r.createdAt < twoDaysAgo)
+
+        const sectionList = []
+        if (recent.length > 0) {
+            sectionList.push({ title: 'Recent Activity', data: recent })
+        }
+        if (older.length > 0) {
+            sectionList.push({ title: 'Older Reports', data: older })
+        }
+
+        return { sections: sectionList }
+    }, [reports])
 
     return (
         <View style={styles.container}>
-            {/* PENDING SECTION */}
-            {pendingReports.length > 0 && (
-                <View style={styles.section}>
-                    <Text style={[styles.header, { color: '#ed8936' }]}>
-                        ⏳ Pending Upload ({pendingReports.length})
-                    </Text>
-                    <FlatList
-                        data={pendingReports}
-                        keyExtractor={item => item.id}
-                        renderItem={({ item }) => <ReportItem report={item} />}
-                        scrollEnabled={false} // Let main ScrollView handle it if we wrapped it, but here we might need flexibility. 
-                    // Actually, rendering two FlatLists in a View might scroll badly. 
-                    // Better to use one FlatList with sections, but we can just use mapping for now if lists aren't huge.
-                    // Or just render them directly if we assume reasonable volume for this hackathon app.
-                    />
+            {/* Header */}
+            <View style={styles.header}>
+                <View style={styles.headerTop}>
+                    <Text style={styles.headerTitle}>My Reports</Text>
                 </View>
+            </View>
+
+            {/* Reports List */}
+            {sections.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyIcon}>📋</Text>
+                    <Text style={styles.emptyTitle}>No Reports Yet</Text>
+                    <Text style={styles.emptyText}>
+                        Tap the + button to create your first incident report
+                    </Text>
+                </View>
+            ) : (
+                <SectionList
+                    sections={sections}
+                    keyExtractor={item => item.id}
+                    renderItem={({ item }) => (
+                        <ReportItem report={item} onPress={onReportPress} />
+                    )}
+                    renderSectionHeader={({ section: { title } }) => (
+                        <View style={styles.sectionHeader}>
+                            <Text style={styles.sectionTitle}>{title.toUpperCase()}</Text>
+                            <View style={styles.sectionLine} />
+                        </View>
+                    )}
+                    contentContainerStyle={styles.listContent}
+                    stickySectionHeadersEnabled={false}
+                />
             )}
 
-            {/* SYNCED SECTION */}
-            <View style={styles.section}>
-                <Text style={[styles.header, { color: '#38b2ac' }]}>
-                    ✅ Synced History
-                </Text>
-                {syncedReports.length === 0 ? (
-                    <Text style={styles.emptyText}>No synced reports yet.</Text>
-                ) : (
-                    <FlatList
-                        data={syncedReports}
-                        keyExtractor={item => item.id}
-                        renderItem={({ item }) => <ReportItem report={item} />}
-                    />
-                )}
-            </View>
         </View>
     )
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, marginTop: 10, paddingHorizontal: 20 },
-    section: { marginBottom: 20 },
-    header: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
-    emptyText: { fontStyle: 'italic', color: '#999' },
-    list: { paddingHorizontal: 20 },
-    item: { padding: 15, backgroundColor: '#f9f9f9', marginBottom: 10, borderRadius: 8, borderLeftWidth: 5 },
-    row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
-    typeBadge: { fontSize: 10, fontWeight: 'bold', textTransform: 'uppercase', color: '#555', backgroundColor: '#e0e0e0', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-    date: { fontSize: 10, color: '#999' },
-    card: {
-        padding: 15,
-        marginVertical: 6,
-        backgroundColor: '#fff',
-        borderRadius: 8,
-        elevation: 2,
-        borderWidth: 1,
-        borderColor: '#eee'
+    container: {
+        flex: 1,
+        backgroundColor: '#F8F6F6',
     },
-    headerRow: {
+
+    // Header Styles
+    header: {
+        backgroundColor: '#fff',
+        paddingTop: 48,
+        paddingBottom: 8,
+        paddingHorizontal: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F3F4F6',
+    },
+    headerTop: {
+        justifyContent: 'center',
+        marginBottom: 8,
+    },
+    headerTitle: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#0F172A',
+    },
+
+    // Filter Chips
+    filterContainer: {
+        flexDirection: 'row',
+        gap: 12,
+        paddingVertical: 8,
+    },
+    filterChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        borderRadius: 20,
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+    },
+    filterChipActive: {
+        backgroundColor: '#0F172A',
+        borderColor: '#0F172A',
+    },
+    filterChipText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#64748B',
+    },
+    filterChipTextActive: {
+        color: '#fff',
+        fontWeight: '600',
+    },
+
+    // List Content
+    listContent: {
+        padding: 16,
+        paddingBottom: 100,
+    },
+
+    // Section Header
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    sectionTitle: {
+        fontSize: 11,
+        fontWeight: 'bold',
+        color: '#94A3B8',
+        letterSpacing: 1,
+    },
+    sectionLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#E5E7EB',
+    },
+
+    // Report Card
+    card: {
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: '#F3F4F6',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 1,
+    },
+    cardContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 5
     },
-    title: {
+    cardMain: {
+        flexDirection: 'row',
+        flex: 1,
+        gap: 16,
+    },
+    iconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    iconText: {
+        fontSize: 24,
+    },
+    contentContainer: {
+        flex: 1,
+    },
+    cardTitle: {
         fontSize: 16,
         fontWeight: 'bold',
-        flex: 1
+        color: '#0F172A',
+        marginBottom: 4,
+    },
+    cardDate: {
+        fontSize: 12,
+        color: '#64748B',
+        marginBottom: 8,
+    },
+
+    // Badges
+    badgeRow: {
+        flexDirection: 'row',
+        gap: 8,
+        flexWrap: 'wrap',
     },
     badge: {
         paddingHorizontal: 8,
-        paddingVertical: 2,
-        borderRadius: 12,
-        marginLeft: 10
-    },
-    badgeSynced: {
-        backgroundColor: '#e6fffa',
+        paddingVertical: 4,
+        borderRadius: 6,
         borderWidth: 1,
-        borderColor: '#38b2ac'
+        borderColor: 'transparent',
     },
-    badgePending: {
-        backgroundColor: '#fffaf0',
-        borderWidth: 1,
-        borderColor: '#ed8936'
+    severityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
     },
     badgeText: {
-        fontSize: 10,
+        fontSize: 11,
+        fontWeight: '500',
+    },
+    badgeTextBold: {
         fontWeight: 'bold',
-        color: '#333'
     },
-    description: {
-        fontSize: 14,
-        color: '#444',
-        marginBottom: 10
-    },
-    metaRow: {
-        flexDirection: 'row',
-        gap: 15,
-        marginBottom: 5
-    },
-    meta: {
-        fontSize: 12,
-        color: '#666',
-        fontWeight: '500'
-    },
-    coords: {
+    severityIcon: {
         fontSize: 10,
-        color: '#999',
-        fontFamily: 'monospace'
-    }
+    },
+
+    // Empty State
+    emptyContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 40,
+        paddingTop: 80,
+    },
+    emptyIcon: {
+        fontSize: 64,
+        marginBottom: 16,
+        opacity: 0.3,
+    },
+    emptyTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+        color: '#1E293B',
+        marginBottom: 8,
+    },
+    emptyText: {
+        fontSize: 14,
+        color: '#64748B',
+        textAlign: 'center',
+        lineHeight: 20,
+    },
 })
 
 // Enhance with WatermelonDB observables
-import { Q } from '@nozbe/watermelondb'
-
 const enhance = withObservables(['userId'], ({ userId }: { userId: string }) => ({
     reports: database.get<Report>('reports').query(
         Q.where('user_id', userId),
-        Q.sortBy('created_at', Q.desc) // Optional: Sort by time DB-side too
+        Q.sortBy('created_at', Q.desc)
     )
 }))
 
