@@ -265,11 +265,11 @@ export default function DashboardPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-3">
                 <div className="w-4 h-4 rounded-full" style={{ backgroundColor: "#ef4444" }}></div>
-                <span className="text-xs text-slate-400">Severity 4 - Critical</span>
+                <span className="text-xs text-slate-400">Severity 5 - Very Critical</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-4 h-4 rounded-full" style={{ backgroundColor: "#f97316" }}></div>
-                <span className="text-xs text-slate-400">Severity 5 - Very Critical</span>
+                <span className="text-xs text-slate-400">Severity 4 - Critical</span>
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-4 h-4 rounded-full" style={{ backgroundColor: "#eab308" }}></div>

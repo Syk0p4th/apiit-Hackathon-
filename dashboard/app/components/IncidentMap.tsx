@@ -4,6 +4,7 @@
 import dynamic from "next/dynamic";
 import type { Incident } from "@/types/incident";
 import { useEffect, useState } from "react";
+import { getIncidentTypeName } from "@/lib/incidentTypes";
 import "leaflet/dist/leaflet.css";
 
 const MapContainer = dynamic(
@@ -31,8 +32,8 @@ const SEVERITY_COLORS = {
   1: { name: "green", hex: "#22c55e" },    // Lowest - Green
   2: { name: "blue", hex: "#3b82f6" },     // Low - Blue
   3: { name: "yellow", hex: "#eab308" },   // Medium - Yellow
-  4: { name: "red", hex: "#ef4444" },      // Critical - Red
-  5: { name: "orange", hex: "#f97316" },   // Very Critical - Orange
+  4: { name: "orange", hex: "#f97316" },   // Critical - Orange
+  5: { name: "red", hex: "#ef4444" },      // Very Critical - Red
 };
 
 function getIconBySeverity(severity: number | null) {
@@ -140,7 +141,7 @@ export default function IncidentMap({ incidents }: { incidents: Incident[] }) {
         >
           <Popup>
             <div className="text-xs">
-              <p className="font-semibold">{inc.incidentType}</p>
+              <p className="font-semibold">{getIncidentTypeName(inc.incidentType)}</p>
               <p>Severity: {inc.severity}</p>
               <p>Status: {inc.status}</p>
               <p>{new Date(inc.timestamp).toLocaleString()}</p>

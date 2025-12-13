@@ -2,6 +2,7 @@
 "use client";
 
 import type { Incident } from "@/types/incident";
+import { getIncidentTypeName } from "@/lib/incidentTypes";
 
 function formatDateTime(value?: string | null) {
   if (!value) return "-";
@@ -52,7 +53,7 @@ export default function IncidentTable({
                   ) : null}
                 </td>
                 <td className="py-2 pr-3">{i.reporterName ?? "-"}</td>
-                <td className="py-2 pr-3">{i.incidentType ?? "-"}</td>
+                <td className="py-2 pr-3">{getIncidentTypeName(i.incidentType)}</td>
                 <td className="py-2 pr-3">{i.severity ?? "-"}</td>
                 <td className="py-2 pr-3">{formatDateTime(i.incidentTime ?? i.timestamp)}</td>
                 <td className="py-2 pr-3">

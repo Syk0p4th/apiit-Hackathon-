@@ -1,4 +1,5 @@
 import type { Incident } from "@/types/incident";
+import { getIncidentTypeName } from "@/lib/incidentTypes";
 
 export default function IncidentDetail({
   incident,
@@ -21,7 +22,7 @@ export default function IncidentDetail({
       <div className="absolute right-0 top-0 bottom-0 w-96 bg-slate-900 border-l border-slate-800 shadow-lg flex flex-col z-50">
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b border-slate-800">
-          <h2 className="text-lg font-semibold">{incident.incidentType}</h2>
+          <h2 className="text-lg font-semibold">{getIncidentTypeName(incident.incidentType)}</h2>
           <button
             onClick={onClose}
             className="p-1 hover:bg-slate-800 rounded transition text-lg"
