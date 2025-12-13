@@ -12,6 +12,7 @@ CREATE TABLE public.reports (
     incident_time timestamptz,
     latitude double precision,
     longitude double precision,
+    images text[], -- Array of image URIs/paths
     synced boolean DEFAULT true,
     sync_attempts integer DEFAULT 0,
     created_at timestamptz DEFAULT now(),
