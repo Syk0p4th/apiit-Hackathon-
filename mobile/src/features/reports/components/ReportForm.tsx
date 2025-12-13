@@ -1,6 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { View, TextInput, Button, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native'
 import { LeafletView } from 'react-native-leaflet-view'
+import * as Location from 'expo-location'
 import database from '../../../services/database'
 import 'react-native-get-random-values'
 import Report from '../models/Report'
@@ -31,10 +32,56 @@ export default function ReportForm({ userId }: ReportFormProps) {
     const [severity, setSeverity] = useState<number>(2)
     const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null)
 
+    useEffect(() => {
+        (async () => {
+            const { status } = await Location.requestForegroundPermissionsAsync()
+            if (status !== 'granted') {
+                return
+            }
+
+            const location = await Location.getCurrentPositionAsync({})
+            setLocation({
+                lat: location.coords.latitude,
+                lng: location.coords.longitude,
+            })
+        })()
+    }, [])
+
     const [status, setStatus] = useState<string>('')
 
     const handleSave = async () => {
-        if (!title || !description || !location) return
+        if (!title || !description) {
+            setStatus('Title and Description are required')
+            return
+        }
+
+        let finalLocation = location
+
+        if (!finalLocation) {
+            try {
+                setStatus('Getting location...')
+                const { status } = await Location.requestForegroundPermissionsAsync()
+                if (status !== 'granted') {
+                    setStatus('Permission to access location was denied')
+                    return
+                }
+
+                const location = await Location.getCurrentPositionAsync({})
+                finalLocation = {
+                    lat: location.coords.latitude,
+                    lng: location.coords.longitude,
+                }
+            } catch (error) {
+                console.error(error)
+                setStatus('Error fetching location')
+                return
+            }
+        }
+
+        if (!finalLocation) {
+            setStatus('Could not determine location')
+            return
+        }
 
         try {
             await database.write(async () => {
@@ -47,8 +94,8 @@ export default function ReportForm({ userId }: ReportFormProps) {
                     report.severity = severity
                     report.incidentTime = new Date() // Default to now for incident time
                     report.userId = userId
-                    report.latitude = location.lat
-                    report.longitude = location.lng
+                    report.latitude = finalLocation!.lat
+                    report.longitude = finalLocation!.lng
                     report.createdAt = new Date()
                     report.synced = false
                 })

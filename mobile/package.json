@@ -15,6 +15,7 @@
     "@supabase/supabase-js": "^2.87.1",
     "expo": "~54.0.29",
     "expo-file-system": "~19.0.21",
+    "expo-location": "~19.0.8",
     "expo-secure-store": "~15.0.8",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
