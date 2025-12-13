@@ -2,30 +2,23 @@
 
 import { createClient } from "@supabase/supabase-js";
 
-let supabaseInstance: ReturnType<typeof createClient> | null = null;
+// Create the Supabase client directly - it will work in the browser
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-export function getSupabaseClient() {
-  if (typeof window === "undefined") {
-    return null;
-  }
+console.log("[supabaseClient] Initializing with URL:", supabaseUrl);
+console.log("[supabaseClient] Anon key present:", !!supabaseAnonKey);
 
-  if (supabaseInstance) return supabaseInstance;
-
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Supabase environment variables not set:", {
-      url: supabaseUrl ? "set" : "missing",
-      key: supabaseAnonKey ? "set" : "missing",
-    });
-    return null;
-  }
-
-  supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
-  return supabaseInstance;
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    `Missing Supabase environment variables. URL: ${!supabaseUrl ? "MISSING" : "set"}, Key: ${!supabaseAnonKey ? "MISSING" : "set"}`
+  );
 }
 
-// Lazy initialization - will be called from useEffect in client components
-export const supabase = null;
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+export function getSupabaseClient() {
+  return supabase;
+}
+
 export default supabase;
