@@ -6,7 +6,7 @@ import Report from '../models/Report'
 
 interface ReportListProps {
     reports: Report[]
-    userId: string
+    userId: string | null
 }
 
 const ReportItemComponent = ({ report }: { report: Report }) => {

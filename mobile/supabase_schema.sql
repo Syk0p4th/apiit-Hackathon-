@@ -43,6 +43,12 @@ CREATE POLICY "Users can delete their own reports"
 ON public.reports FOR DELETE 
 USING (auth.uid() = user_id);
 
+-- Policy: Allow Anon (Guest) Inserts
+CREATE POLICY "Anon can insert reports" 
+ON public.reports FOR INSERT 
+TO anon
+WITH CHECK (true);
+
 -- Function to automatically update 'updated_at' on change
 CREATE OR REPLACE FUNCTION handle_updated_at()
 RETURNS TRIGGER AS $$

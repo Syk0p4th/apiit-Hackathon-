@@ -14,7 +14,11 @@ import {
 import { supabase } from '../../../services/api/supabase'
 import { Ionicons } from '@expo/vector-icons'
 
-export default function AuthScreen() {
+interface AuthScreenProps {
+    onGuestLogin?: () => void
+}
+
+export default function AuthScreen({ onGuestLogin }: AuthScreenProps) {
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [name, setName] = useState('')
@@ -306,13 +310,16 @@ export default function AuthScreen() {
                     </View>
 
                     {/* Guest Mode Button */}
-                    <TouchableOpacity
-                        style={styles.guestButton}
-                        disabled={loading}
-                    >
-                        <Ionicons name="megaphone-outline" size={20} color="#ea2a33" />
-                        <Text style={styles.guestButtonText}>Guest Quick Report</Text>
-                    </TouchableOpacity>
+                    {onGuestLogin && (
+                        <TouchableOpacity
+                            style={styles.guestButton}
+                            onPress={onGuestLogin}
+                            disabled={loading}
+                        >
+                            <Ionicons name="megaphone-outline" size={20} color="#ea2a33" />
+                            <Text style={styles.guestButtonText}>Guest Quick Report</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 {/* Footer */}

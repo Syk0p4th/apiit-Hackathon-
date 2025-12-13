@@ -21,6 +21,7 @@ export default function App() {
     const syncStatus = useAutoSync()
     const [isOnline, setIsOnline] = useState<boolean | null>(null)
     const [session, setSession] = useState<Session | null>(null)
+    const [isGuest, setIsGuest] = useState(false)
 
     const [activeTab, setActiveTab] = useState<'form' | 'list'>('form')
     const [isLoading, setIsLoading] = useState(true)
@@ -49,6 +50,7 @@ export default function App() {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session)
+            if (session) setIsGuest(false)
             setIsLoading(false)
         })
 
@@ -66,17 +68,22 @@ export default function App() {
         )
     }
 
+    const currentUserId = session?.user.id || null
+    const isAuthenticated = !!session || isGuest
+
     return (
         <SafeAreaProvider>
             <SafeAreaView style={styles.container}>
                 <StatusBar barStyle={"dark-content" as StatusBarStyle} />
 
-                {!session ? (
-                    <AuthScreen />
+                {!isAuthenticated ? (
+                    <AuthScreen onGuestLogin={() => setIsGuest(true)} />
                 ) : (
                     <>
                         <View style={styles.header}>
-                            <Text style={styles.title}>Safe Area Reporting</Text>
+                            <Text style={styles.title}>
+                                {isGuest ? 'Guest Reporting' : 'Safe Area Reporting'}
+                            </Text>
 
                             <View style={styles.statusRow}>
                                 <Text style={[styles.status, { color: isOnline ? 'green' : 'red' }]}>
@@ -88,16 +95,23 @@ export default function App() {
                             </View>
 
                             <View style={{ marginTop: 10, flexDirection: 'row', gap: 10 }}>
-                                <Button title="Sign Out" onPress={() => supabase.auth.signOut()} color="red" />
+                                <Button
+                                    title={isGuest ? "Exit Guest Mode" : "Sign Out"}
+                                    onPress={() => {
+                                        if (isGuest) setIsGuest(false)
+                                        else supabase.auth.signOut()
+                                    }}
+                                    color="red"
+                                />
                             </View>
                         </View>
 
                         {/* Content Area */}
                         <View style={styles.content}>
                             {activeTab === 'form' ? (
-                                <ReportForm userId={session.user.id} />
+                                <ReportForm userId={currentUserId} />
                             ) : (
-                                <ReportList userId={session.user.id} />
+                                <ReportList userId={currentUserId} />
                             )}
                         </View>
 

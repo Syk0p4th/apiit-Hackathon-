@@ -12,7 +12,7 @@ import Report from '../models/Report'
 import ImagePickerSection from './form/ImagePickerSection'
 
 interface ReportFormProps {
-    userId: string
+    userId: string | null
 }
 
 const getMapHtml = (location: { lat: number; lng: number } | null) => `
@@ -167,7 +167,7 @@ export default function ReportForm({ userId }: ReportFormProps) {
             if (!finalReporter) {
                 finalReporter = user?.user_metadata?.full_name || user?.email || 'Anonymous'
             }
-        } catch (e) {}
+        } catch (e) { }
 
         // Note: Title/Description are computed; no manual input enforcement
 

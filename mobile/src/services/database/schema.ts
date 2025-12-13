@@ -17,7 +17,7 @@ export default appSchema({
                 { name: 'images', type: 'string', isOptional: true },
                 { name: 'created_at', type: 'number' },
                 { name: 'updated_at', type: 'number' },
-                { name: 'user_id', type: 'string' },
+                { name: 'user_id', type: 'string', isOptional: true },
                 { name: 'synced', type: 'boolean' },
                 { name: 'sync_attempts', type: 'number' },
             ]
