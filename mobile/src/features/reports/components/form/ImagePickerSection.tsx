@@ -12,8 +12,9 @@ export default function ImagePickerSection({ images, onImagesChange }: ImagePick
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
                 mediaTypes: ['images'],
-                allowsEditing: false,
-                quality: 0.5, // Reduced quality for base64 performance
+                allowsEditing: true, // Allows user to crop, and usually re-encodes smaller
+                aspect: [4, 3],
+                quality: 0.3, // Aggressive compression for Base64 (approx 100-300kb per img)
                 base64: true,
             })
 
