@@ -11,13 +11,21 @@ export default function ImagePickerSection({ images, onImagesChange }: ImagePick
     const pickImage = async () => {
         try {
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                mediaTypes: ['images'],
                 allowsEditing: false,
-                quality: 0.8,
+                quality: 0.5, // Reduced quality for base64 performance
+                base64: true,
             })
 
             if (!result.canceled && result.assets && result.assets.length > 0) {
-                onImagesChange([...images, result.assets[0].uri])
+                console.log('ImagePicker Result:', result)
+                const asset = result.assets[0]
+                if (asset.base64) {
+                    const base64Img = `data:image/jpeg;base64,${asset.base64}`
+                    console.log('Base64 Image Length:', base64Img.length)
+                    // console.log('Base64 Image:', base64Img) // Uncomment if full string needed
+                    onImagesChange([...images, base64Img])
+                }
             }
         } catch (e) {
             Alert.alert('Error', 'Could not select image.')
