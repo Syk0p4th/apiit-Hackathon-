@@ -8,22 +8,22 @@ const sanitizeImages = (raw: any) => {
 export default class Report extends Model {
     static table = 'reports'
 
-    @text('title') title!: string
-    @text('description') description!: string
-    @text('reporter_name') reporterName!: string
-    @field('incident_type') incidentType!: number
-    @field('severity') severity!: number
-    @date('incident_time') incidentTime!: Date
-    @field('latitude') latitude!: number | null
-    @field('longitude') longitude!: number | null
-    @json('images', sanitizeImages) images!: string[]
+    @text('title') declare title: string
+    @text('description') declare description: string
+    @text('reporter_name') declare reporterName: string
+    @field('incident_type') declare incidentType: number
+    @field('severity') declare severity: number
+    @date('incident_time') declare incidentTime: Date
+    @field('latitude') declare latitude: number | null
+    @field('longitude') declare longitude: number | null
+    @json('images', sanitizeImages) declare images: string[]
 
-    @date('created_at') createdAt!: Date
-    @date('updated_at') updatedAt!: Date
-    @text('user_id') userId!: string | null
+    @date('created_at') declare createdAt: Date
+    @date('updated_at') declare updatedAt: Date
+    @text('user_id') declare userId: string | null
 
-    @field('synced') synced!: boolean
-    @field('sync_attempts') syncAttempts!: number
+    @field('synced') declare synced: boolean
+    @field('sync_attempts') declare syncAttempts: number
 
     get incidentTypeLabel() {
         switch (this.incidentType) {
