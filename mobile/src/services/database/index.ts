@@ -10,7 +10,11 @@ import Report from '../../features/reports/models/Report'
 const adapter = new LokiJSAdapter({
     schema,
     useWebWorker: false,
-    useIncrementalIndexedDB: false, // Must be false for React Native
+    useIncrementalIndexedDB: false,
+    extraLokiOptions: {
+        autosave: true,
+        autosaveInterval: 2500,
+    },
     onSetUpError: (error: any) => {
         console.error('LokiJS Setup Failed', error)
     }
