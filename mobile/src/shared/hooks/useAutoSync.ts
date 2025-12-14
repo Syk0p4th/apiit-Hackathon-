@@ -56,11 +56,15 @@ export function useAutoSync(): string {
         })
 
         // 3. Listen for AppState Changes
+        let appStateTimer: NodeJS.Timeout
+
         const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
             if (nextAppState === 'active') {
                 console.log('[AutoSync] App Foregrounded. Waiting for network...')
+                // Clear any existing timer to avoid multiple syncs
+                clearTimeout(appStateTimer)
                 // Wait 2s for network stack to wake up before triggering sync
-                setTimeout(() => {
+                appStateTimer = setTimeout(() => {
                     triggerSync()
                 }, 2000)
             }
@@ -70,6 +74,7 @@ export function useAutoSync(): string {
             unsubscribeNet()
             subscription.remove()
             clearTimeout(debounceTimer)
+            clearTimeout(appStateTimer)
         }
     }, [])
 
