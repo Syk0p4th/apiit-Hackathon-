@@ -58,8 +58,11 @@ export function useAutoSync(): string {
         // 3. Listen for AppState Changes
         const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
             if (nextAppState === 'active') {
-                console.log('[AutoSync] App Foregrounded. Checking sync...')
-                triggerSync()
+                console.log('[AutoSync] App Foregrounded. Waiting for network...')
+                // Wait 2s for network stack to wake up before triggering sync
+                setTimeout(() => {
+                    triggerSync()
+                }, 2000)
             }
         })
 
