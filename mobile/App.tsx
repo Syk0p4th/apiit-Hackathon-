@@ -11,6 +11,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import NetInfo from '@react-native-community/netinfo'
 import { Session } from '@supabase/supabase-js'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import ReportForm from './src/features/reports/components/ReportForm'
 import ReportList from './src/features/reports/components/ReportList'
@@ -51,7 +52,7 @@ const BrandingHeader = ({ isSynced, isOnline, onSignOut }: { isSynced: boolean; 
 
                 <View style={styles.brandingInfo}>
                     <Text style={styles.brandTitle}>Project Aegis</Text>
-                    
+
                     <View style={styles.statusRow}>
                         <View style={styles.statusItem}>
                             <View style={styles.dotContainer}>
@@ -123,9 +124,31 @@ export default function App() {
         const checkSession = async () => {
             try {
                 console.log('[App] Checking session...')
-                const { data: { session } } = await supabase.auth.getSession()
-                console.log('[App] Session found:', !!session)
-                setSession(session)
+                const { data } = await supabase.auth.getSession()
+
+                if (data.session) {
+                    console.log('[App] Session found (Live)')
+                    setSession(data.session)
+                } else {
+                    // Fallback: If no session from SDK (maybe expired & offline), check storage manually
+                    console.log('[App] No live session. Checking offline storage...')
+                    // Note: This key depends on your Supabase Project ID
+                    const storageKey = 'sb-jvvfkmwdsbhpyxfwwkmh-auth-token'
+
+                    // We need to dinamically import/require storage because we are in App.tsx
+                    // But we can just use the exposed getItem from our helper if we export it, or use AsyncStorage direct
+                    const savedSession = await AsyncStorage.getItem(storageKey)
+
+                    if (savedSession) {
+                        const parsed = JSON.parse(savedSession)
+                        if (parsed) {
+                            console.log('[App] Restored OFFLINE session')
+                            setSession(parsed)
+                        }
+                    } else {
+                        console.log('[App] No offline session found')
+                    }
+                }
             } catch (error) {
                 console.log('[App] Error loading session:', error)
             } finally {

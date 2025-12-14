@@ -19,11 +19,9 @@ export async function sync() {
     isSyncing = true
     try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (!session?.user) {
-            console.error('User not authenticated')
-            return
-        }
-        const user = session.user
+        // Allow sync even if no user (Guest Mode)
+        // if (!session?.user) { ... } -> Removed to support Guest
+        const user = session?.user || null
         await synchronize({
             database,
             sendCreatedAsUpdated: false, // Explicitly separate create/update for clearer debugging
