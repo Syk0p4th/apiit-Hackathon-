@@ -41,25 +41,33 @@ export async function sync() {
 
                 const safeData = (data as any[]) || []
 
+                // If first sync (no lastPulledAt), everything is new -> 'created'
+                // If subsequent sync, we don't know if it's new or updated without checking local DB, 
+                // but WatermelonDB handles "update non-existent" by creating it (with a warning).
+                // So we stick to 'updated' for incremental syncs to be safe.
+                const isInitialSync = !lastPulledAt
+
+                const mappedReports = safeData.map(row => ({
+                    id: row.id,
+                    title: row.title,
+                    description: row.description,
+                    reporter_name: row.reporter_name,
+                    incident_type: row.incident_type,
+                    severity: row.severity,
+                    incident_time: new Date(safeDate(row.incident_time)).getTime(),
+                    latitude: row.latitude,
+                    longitude: row.longitude,
+                    created_at: new Date(safeDate(row.created_at)).getTime(),
+                    user_id: row.user_id,
+                    images: row.images ? JSON.stringify(row.images) : '[]',
+                    synced: true,
+                    sync_attempts: row.sync_attempts
+                }))
+
                 const changes = {
                     reports: {
-                        created: [],
-                        updated: safeData.map(row => ({
-                            id: row.id,
-                            title: row.title,
-                            description: row.description,
-                            reporter_name: row.reporter_name,
-                            incident_type: row.incident_type,
-                            severity: row.severity,
-                            incident_time: new Date(safeDate(row.incident_time)).getTime(),
-                            latitude: row.latitude,
-                            longitude: row.longitude,
-                            created_at: new Date(safeDate(row.created_at)).getTime(),
-                            user_id: row.user_id,
-                            images: row.images ? JSON.stringify(row.images) : '[]', // Supabase (Array) -> Local (String)
-                            synced: true,
-                            sync_attempts: row.sync_attempts
-                        })),
+                        created: isInitialSync ? mappedReports : [],
+                        updated: isInitialSync ? [] : mappedReports,
                         deleted: [],
                     },
                 }
