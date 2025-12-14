@@ -179,7 +179,7 @@ export default function DashboardPage() {
   }, []);
 
   const total = incidents.length;
-  const critical = incidents.filter((i) => i.severity === 1).length;
+  const critical = incidents.filter((i) => (i.severity ?? 0) >= 4).length;
 
 
   // Apply filters and sorting
@@ -238,7 +238,7 @@ export default function DashboardPage() {
 
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <StatCard label="Total incidents" value={total.toString()} />
-        <StatCard label="Critical (S1)" value={critical.toString()} />
+        <StatCard label="Critical (S4+)" value={critical.toString()} />
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[800px]">

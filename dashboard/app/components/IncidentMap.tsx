@@ -5,7 +5,10 @@ import dynamic from "next/dynamic";
 import type { Incident } from "@/types/incident";
 import { useEffect, useState } from "react";
 import { getIncidentTypeName } from "@/lib/incidentTypes";
-import DangerZoneLayer from "./DangerZoneLayer";
+const DangerZoneLayer = dynamic(
+  () => import("./DangerZoneLayer"),
+  { ssr: false }
+);
 import "leaflet/dist/leaflet.css";
 
 const MapContainer = dynamic(
